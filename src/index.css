@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-body text-primary-900 bg-white;
+  }
+  html, body, #root {
+  height: 100%;
+}
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+
+  /* ensure any section with an id scrolls into view below the navbar */
+  section[id] {
+    @apply scroll-mt-20;    /* 4rem = 64px offset */
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-900 text-white px-8 py-3 rounded-full hover:bg-primary-800 transition-colors duration-300 text-sm font-medium;
+  }
+  
+  .btn-secondary {
+    @apply border-2 border-primary-900 text-primary-900 px-8 py-3 rounded-full hover:bg-primary-900 hover:text-white transition-colors duration-300 text-sm font-medium;
+  }
+  
+  .section-title {
+    @apply text-4xl md:text-5xl font-display text-primary-900 mb-6 font-light;
+  }
+  
+  .section-subtitle {
+    @apply text-lg md:text-xl text-primary-700 mb-12 max-w-2xl mx-auto;
+  }
+}
+
+/* push the hero down by the height of your fixed navbar */
+.hero-section {
+  @apply pt-20 min-h-screen bg-white;
+}
+
+.nav-link {
+  @apply text-primary-900 hover:text-primary-700 transition-colors duration-300 text-sm;
+}
+
+.card {
+  @apply bg-white p-8 shadow-sm hover:shadow-md transition-shadow duration-300;
+}
+
+.form-input {
+  @apply w-full px-4 py-2 border-b-2 border-primary-200 focus:border-primary-900 focus:outline-none bg-transparent transition-colors duration-300;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-primary-700 mb-2;
+}
+
+.grid-gallery {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8;
+}
+/* width: double the container content, so 200% */
+/* global CSS */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  display: inline-flex;
+  animation: marquee 20s linear infinite;
+  padding-block: 1rem;
+}
+
+.text-shadow {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}

@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-gray-800 bg-gray-50;
+  }
+}
+
+@layer components {
+  .bg-olive-50 {
+    background-color: #f8faee;
+  }
+  
+  .bg-olive-100 {
+    background-color: #eef2d7;
+  }
+  
+  .bg-olive-500 {
+    background-color: #6b8e23;
+  }
+  
+  .bg-olive-600 {
+    background-color: #556B2F;
+  }
+  
+  .bg-olive-700 {
+    background-color: #4F5F2A;
+  }
+  
+  .bg-olive-800 {
+    background-color: #3F4C22;
+  }
+  
+  .text-olive-500 {
+    color: #6b8e23;
+  }
+  
+  .text-olive-600 {
+    color: #556B2F;
+  }
+  
+  .text-olive-700 {
+    color: #4F5F2A;
+  }
+  
+  .border-olive-500 {
+    border-color: #6b8e23;
+  }
+  
+  .border-olive-700 {
+    border-color: #4F5F2A;
+  }
+  
+  .ring-olive-500 {
+    --tw-ring-color: #6b8e23;
+  }
+  
+  .hover\:bg-olive-50:hover {
+    background-color: #f8faee;
+  }
+  
+  .hover\:bg-olive-700:hover {
+    background-color: #4F5F2A;
+  }
+  
+  .hover\:bg-olive-800:hover {
+    background-color: #3F4C22;
+  }
+}
+
+/* Transitions and animations */
+.transition-colors {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Custom scrollbar for better UX */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
