@@ -1,6 +1,6 @@
 // server/routes/bookingsAdmin.js
 import express from 'express';
-import Booking from '../models/Booking.js';
+import Booking from '../models/booking.js';
 import Schedule from '../models/schedule.js';
 import { authenticateAdmin } from '../middleware/authMiddleware.js';
 
@@ -61,7 +61,27 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
         newTimeSlot = oldTimeSlot;
       }
 
-      // Validate newDate if it changed (you already have that code).
+      // FIX: The logic to free the old slot now runs if date OR time changes.
+      // Free the old slot
+      const oldDayStart = new Date(oldDateISO);
+      oldDayStart.setUTCHours(0, 0, 0, 0);
+      const oldSchedule = await Schedule.findOne({
+        adminId: req.user.userId,
+        date:    oldDayStart
+      });
+      if (oldSchedule) {
+        const idxOld = oldSchedule.slots.findIndex(
+          slot =>
+            slot.time.trim().toLowerCase() ===
+            oldTimeSlot.trim().toLowerCase()
+        );
+        if (idxOld !== -1) {
+          oldSchedule.slots[idxOld].isAvailable = true;
+          await oldSchedule.save();
+        }
+      }
+
+      // Occupy the new slot
       const actualNewDate = isDateChanged ? newDate : oldDateISO;
       if (isNaN(Date.parse(actualNewDate))) {
         return res.status(400).json({ message: 'Invalid new date' });
@@ -69,28 +89,6 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
       const newDayStart = new Date(actualNewDate);
       newDayStart.setUTCHours(0, 0, 0, 0);
 
-      // 2a) Free the old slot if date changed:
-      if (isDateChanged) {
-        const oldDayStart = new Date(oldDateISO);
-        oldDayStart.setUTCHours(0, 0, 0, 0);
-        const oldSchedule = await Schedule.findOne({
-          adminId: req.user.userId,
-          date:    oldDayStart
-        });
-        if (oldSchedule) {
-          const idxOld = oldSchedule.slots.findIndex(
-            slot =>
-              slot.time.trim().toLowerCase() ===
-              oldTimeSlot.trim().toLowerCase()
-          );
-          if (idxOld !== -1) {
-            oldSchedule.slots[idxOld].isAvailable = true;
-            await oldSchedule.save();
-          }
-        }
-      }
-
-      // 2b) Occupy the new slot (using newTimeSlot, which is now guaranteed to be a non‐undefined string):
       const newSchedule = await Schedule.findOne({
         adminId: req.user.userId,
         date:    newDayStart

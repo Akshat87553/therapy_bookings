@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import axios from 'axios';
-import { format, addDays, isSameDay } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 interface AvailabilitySlot {
   time: string;
   isAvailable: boolean;
-  type: string;
+  slotType: string;
 }
 
 interface BaseWeekViewProps {
@@ -26,53 +26,35 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
 
   const timeSlots = {
     Night: [
-      '12:00 AM', '12:30 AM',
-      '01:00 AM', '01:30 AM',
-      '02:00 AM', '02:30 AM',
-      '03:00 AM', '03:30 AM',
-      '04:00 AM', '04:30 AM',
-      '05:00 AM', '05:30 AM',
-      '06:00 AM', '06:30 AM',
-      '07:00 AM', '07:30 AM',
+      '12:00 AM', '12:30 AM', '01:00 AM', '01:30 AM', '02:00 AM', '02:30 AM',
+      '03:00 AM', '03:30 AM', '04:00 AM', '04:30 AM', '05:00 AM', '05:30 AM',
+      '06:00 AM', '06:30 AM', '07:00 AM', '07:30 AM',
     ],
     Day: [
-      '08:00 AM', '08:30 AM',
-      '09:00 AM', '09:30 AM',
-      '10:00 AM', '10:30 AM',
-      '11:00 AM', '11:30 AM',
-      '12:00 PM', '12:30 PM',
-      '01:00 PM', '01:30 PM',
-      '02:00 PM', '02:30 PM',
-      '03:00 PM', '03:30 PM',
-      '04:00 PM', '04:30 PM',
-      '05:00 PM', '05:30 PM',
-      '06:00 PM', '06:30 PM',
-      '07:00 PM', '07:30 PM',
-      '08:00 PM', '08:30 PM',
-      '09:00 PM', '09:30 PM',
-      '10:00 PM', '10:30 PM',
+      '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+      '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM',
+      '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+      '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
+      '08:00 PM', '08:30 PM', '09:00 PM', '09:30 PM', '10:00 PM', '10:30 PM',
     ]
-  };
-
-  // Helper to get JWT token from localStorage
-  const getToken = (): string | null => {
-    return localStorage.getItem('token');
   };
 
   useEffect(() => {
     fetchAvailabilitySlots();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate]);
 
   const fetchAvailabilitySlots = async () => {
     try {
       const start = format(weekDates[0], 'yyyy-MM-dd');
       const end = format(weekDates[6], 'yyyy-MM-dd');
-      const token = getToken();
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const response = await axios.get(
-        `${API_URL}/availability?start=${start}&end=${end}`,
-        { headers }
+        `${API_URL}/availability`,
+        {
+          params: { start, end },
+          withCredentials: true,
+        }
       );
 
       const slots: Record<string, { available: boolean; type: string }> = {};
@@ -82,7 +64,7 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
           const key = `${dateKey}-${slot.time}`;
           slots[key] = {
             available: slot.isAvailable,
-            type: slot.type,
+            type: slot.slotType,
           };
         });
       });
@@ -90,6 +72,7 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
       setSelectedSlots(slots);
       setError(null);
     } catch (e: any) {
+      console.error('Error fetching availability slots:', e);
       if (e.response?.status === 401) {
         setError('Please log in to view availability');
       } else {
@@ -104,29 +87,27 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
     const key = `${dateString}-${time}`;
     const isSelected = selectedSlots[key]?.available;
 
-    const newSlot = {
-      date: dateString,
-      day_of_week: dayOfWeek,
-      time_slot: time,
-      slot_type: slotType,
-      is_available: !isSelected,
-    };
+    const newSlotState = !isSelected;
 
-    // Optimistic UI update
+    const originalState = selectedSlots[key];
     setSelectedSlots((prev) => ({
       ...prev,
-      [key]: { available: !isSelected, type: slotType },
+      [key]: { available: newSlotState, type: slotType },
     }));
 
     try {
-      const token = getToken();
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       await axios.post(
         `${API_URL}/availability`,
-        newSlot,
-        { headers }
+        {
+          date: dateString,
+          day_of_week: dayOfWeek,
+          time_slot: time,
+          slot_type: slotType,
+          is_available: newSlotState,
+        },
+        { withCredentials: true }
       );
-      onSlotSelect(dateString, dayOfWeek, time, slotType, !isSelected);
+      onSlotSelect(dateString, dayOfWeek, time, slotType, newSlotState);
       setError(null);
     } catch (error: any) {
       console.error('Slot update failed:', error);
@@ -138,37 +119,58 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
       // Revert on error
       setSelectedSlots((prev) => ({
         ...prev,
-        [key]: { available: isSelected, type: slotType },
+        [key]: originalState,
       }));
     }
   };
 
-  // Determine today (actual date) and if all slots are selected for today
-  const today = new Date();
-  const todayString = format(today, 'yyyy-MM-dd');
-  const isInWeek = weekDates.some((d) => isSameDay(d, today));
-  const allPresentSelected = isInWeek && timeSlots[selectedTimeRange].every((time) => {
-    const key = `${todayString}-${time}`;
-    return selectedSlots[key]?.available;
-  });
+  const handleSelectAllForDay = async (date: Date, shouldSelect: boolean) => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    const dayOfWeek = format(date, 'EEEE').toUpperCase();
+    const currentDaySlots = timeSlots[selectedTimeRange];
 
-  const handleApplyToAll = () => {
-    if (!isInWeek) return;
-    setSelectedSlots((prev) => {
-      const updated = { ...prev };
-      weekDates.forEach((date) => {
-        const dateString = format(date, 'yyyy-MM-dd');
-        if (dateString === todayString) return;
-        timeSlots[selectedTimeRange].forEach((time) => {
-          const presentKey = `${todayString}-${time}`;
-          const targetKey = `${dateString}-${time}`;
-          if (selectedSlots[presentKey]?.available) {
-            updated[targetKey] = { available: true, type: selectedSlots[presentKey].type };
-          }
-        });
-      });
-      return updated;
+    const originalStates: Record<string, any> = {};
+    currentDaySlots.forEach(time => {
+        const key = `${dateString}-${time}`;
+        originalStates[key] = selectedSlots[key];
     });
+
+    setSelectedSlots(prev => {
+        const newSelectedSlots = {...prev};
+        currentDaySlots.forEach(time => {
+            const key = `${dateString}-${time}`;
+            newSelectedSlots[key] = { available: shouldSelect, type: slotType };
+        });
+        return newSelectedSlots;
+    });
+
+    // Prefer bulk endpoint if available on server
+    try {
+      await axios.post(
+        `${API_URL}/availability/bulk`,
+        {
+          date: dateString,
+          day_of_week: dayOfWeek,
+          time_slots: currentDaySlots,
+          slot_type: slotType,
+          is_available: shouldSelect,
+        },
+        { withCredentials: true }
+      );
+
+      currentDaySlots.forEach(time => {
+          onSlotSelect(dateString, dayOfWeek, time, slotType, shouldSelect);
+      });
+      setError(null);
+    } catch (error: any) {
+      console.error('Bulk update failed:', error);
+      if (error.response?.status === 401) {
+        setError('Please log in to update availability');
+      } else {
+        setError('Failed to update all slots');
+      }
+      setSelectedSlots(prev => ({...prev, ...originalStates}));
+    }
   };
 
   return (
@@ -194,37 +196,39 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
       </div>
 
       <div className="flex items-center space-x-2">
-        <span className="text-sm">{selectedTimeRange}</span>
-        <ChevronDown className="w-4 h-4" />
-        <button onClick={() => setSelectedTimeRange((prev) => (prev === 'Night' ? 'Day' : 'Night'))} className="text-sm underline text-blue-600">
-          Toggle to {selectedTimeRange === 'Night' ? 'Day' : 'Night'}
+        <span className="text-sm font-medium">{selectedTimeRange} View</span>
+        <button onClick={() => setSelectedTimeRange((prev) => (prev === 'Night' ? 'Day' : 'Night'))} className="text-sm underline text-blue-600 hover:text-blue-800">
+          (Toggle to {selectedTimeRange === 'Night' ? 'Day' : 'Night'})
         </button>
       </div>
+      
+      <div className="grid grid-cols-7 gap-4 mt-4">
+        {weekDates.map((date) => {
+            const dateString = format(date, 'yyyy-MM-dd');
+            const allSelected = timeSlots[selectedTimeRange].every(time => {
+                const key = `${dateString}-${time}`;
+                return selectedSlots[key]?.available;
+            });
 
-      <div className="grid grid-cols-8 gap-4 mt-4">
-        <div></div>
-        {weekDates.map((date) => (
-          <div key={date.toISOString()} className="text-center">
-            <div className="text-sm font-medium">{format(date, 'EEE, MMM d')}</div>
-            <div className="text-xs text-gray-500">{format(date, 'yyyy-MM-dd')}</div>
-          </div>
-        ))}
+            return (
+              <div key={date.toISOString()} className="text-center space-y-2">
+                <div className="text-sm font-medium">{format(date, 'EEE, MMM d')}</div>
+                <div className="flex items-center justify-center space-x-1">
+                    <input 
+                        type="checkbox" 
+                        id={`select-all-${dateString}`}
+                        checked={allSelected}
+                        onChange={(e) => handleSelectAllForDay(date, e.target.checked)}
+                        className="h-4 w-4 rounded text-olive-600 focus:ring-olive-500"
+                    />
+                    <label htmlFor={`select-all-${dateString}`} className="text-xs text-gray-600">All</label>
+                </div>
+              </div>
+            )
+        })}
       </div>
 
-      {allPresentSelected && (
-        <div className="flex items-center space-x-2">
-          <input type="checkbox" id="applyToAll" onChange={handleApplyToAll} />
-          <label htmlFor="applyToAll" className="text-sm text-gray-700">Apply today’s slots to all days</label>
-        </div>
-      )}
-
-      <div className="grid grid-cols-8 gap-4">
-        <div className="space-y-2">
-          {timeSlots[selectedTimeRange].map((time) => (
-            <div key={time} className="text-sm text-right">{time}</div>
-          ))}
-        </div>
-
+      <div className="grid grid-cols-7 gap-4">
         {weekDates.map((date) => (
           <div key={date.toISOString()} className="space-y-2">
             {timeSlots[selectedTimeRange].map((time) => {
@@ -238,7 +242,11 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
                   key={key}
                   onClick={() => handleSlotClick(date, time)}
                   className={`w-full text-sm py-1 rounded border text-center transition-all
-                    ${isActive ? slot.type === 'online' ? 'bg-amber-200 border-amber-300' : slot.type === 'in_person' ? 'bg-blue-200 border-blue-300' : 'bg-green-200 border-green-300' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                    ${isActive 
+                        ? slot.type === 'online' ? 'bg-amber-200 border-amber-300' 
+                        : slot.type === 'in_person' ? 'bg-blue-200 border-blue-300' 
+                        : 'bg-green-200 border-green-300' 
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
                   {time}
                 </button>
               );

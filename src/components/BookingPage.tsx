@@ -27,7 +27,7 @@ interface Slot {
 }
 
 interface SlotData {
-  date:  string;
+  date:  string | Date;
   slots: Slot[];
 }
 
@@ -95,25 +95,7 @@ const BookingPage: React.FC = () => {
       const url = `http://localhost:5000/api/public/fees/${adminId}?region=${regionParam}`;
 
       try {
-        const { data } = await axios.get<{
-          online: {
-            price30: number;
-            price50: number;
-            single30: boolean;
-            single50: boolean;
-            package30: boolean;
-            package50: boolean;
-          };
-          inPerson: {
-            price30: number;
-            price50: number;
-            single30: boolean;
-            single50: boolean;
-            package30: boolean;
-            package50: boolean;
-          };
-          offerCouplesTherapy: boolean;
-        }>(url);
+        const { data } = await axios.get(url);
 
         setOnlinePrice50(data.online.price50);
         setInPersonPrice50(data.inPerson.price50);
@@ -128,7 +110,7 @@ const BookingPage: React.FC = () => {
     fetchFees();
   }, [userCountry, geoLoading]);
 
-  // ─── Fetch available slots from backend ───────────────────────────────────────────
+  // ---------- Fetch available slots ----------
   const fetchAvailableSlots = async () => {
     const start = format(new Date(), 'yyyy-MM-dd');
     const end = format(addDays(new Date(), 6), 'yyyy-MM-dd');
@@ -136,17 +118,20 @@ const BookingPage: React.FC = () => {
     try {
       const { data } = await axios.get<SlotData[]>(
         'http://localhost:5000/api/schedule/available-slots',
-        { params: { start, end }, withCredentials: true }
+        { params: { start, end, adminId }, withCredentials: true }
       );
 
-      // Convert into { [date]: ["10:00 AM", "10:30 AM", ...] }
-      const slotsByDate = data.reduce((acc, { date, slots }) => {
-        const isoDate = date.slice(0, 10);
-        const times = slots.filter((s) => s.isAvailable).map((s) => s.time);
+      const slotsByDate = data.reduce((acc: Record<string, string[]>, item) => {
+        let isoDate: string;
+        if (typeof item.date === 'string') {
+          isoDate = item.date.slice(0, 10);
+        } else {
+          isoDate = format(new Date(item.date), 'yyyy-MM-dd');
+        }
+        const times = (item.slots || []).filter(s => s.isAvailable).map(s => s.time);
         acc[isoDate] = times;
         return acc;
-      }, {} as Record<string, string[]>);
-
+      }, {});
       setAvailableSlotsByDate(slotsByDate);
     } catch (err) {
       console.error('Error fetching available slots:', err);
@@ -156,9 +141,10 @@ const BookingPage: React.FC = () => {
 
   useEffect(() => {
     fetchAvailableSlots();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Razorpay script loader ───────────────────────────────────────────────────────
+  // ─── Razorpay script loader ─────────────────────────────────────────────────────
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
@@ -169,19 +155,32 @@ const BookingPage: React.FC = () => {
     };
   }, []);
 
-  // ─── Helper: given a "hh:mm a" time string, return the next 30-minute slot as "hh:mm a" ─────────
+  // ─── Helper: next 30-min slot
   const getNextThirtyMinSlot = (time: string): string => {
     const parsed = parse(time, 'hh:mm a', new Date());
     const plusThirty = addMinutes(parsed, 30);
-    // Format back into exactly the same “hh:mm a” format
     return format(plusThirty, 'hh:mm a');
   };
 
-  // ─── Given the raw available slots for a date, filter out any “occupied” (just‐booked) slots and their neighbors ────
+  // ─── Minutes until a slot (used for disabling/warning)
+  const minutesUntil = (dateStr: string, time: string): number => {
+    try {
+      const dt = parse(`${dateStr} ${time}`, 'yyyy-MM-dd hh:mm a', new Date());
+      return Math.round((dt.getTime() - new Date().getTime()) / 60000);
+    } catch {
+      return Number.POSITIVE_INFINITY;
+    }
+  };
+
+  const isWithinMinutes = (dateStr: string, time: string, minutes: number) => {
+    const mins = minutesUntil(dateStr, time);
+    return mins <= minutes && mins >= 0;
+  };
+
+  // ─── Occupied filter
   const filterOutOccupied = (rawSlots: string[], forDate: string): string[] => {
     if (!occupiedSlots.length) return rawSlots;
 
-    // Build a set of times to remove: each occupied slot’s own time + that next 30-minute slot
     const toRemove = new Set<string>();
     occupiedSlots.forEach(({ date, time }) => {
       if (date !== forDate) return;
@@ -192,7 +191,23 @@ const BookingPage: React.FC = () => {
     return rawSlots.filter((slot) => !toRemove.has(slot));
   };
 
-  // ─── Helper: categorize slots into morning/afternoon/evening ─────────────────────────
+  // ─── Remove past times (today) and hide past dates
+  const filterOutPastTimes = (slots: string[], dateStr: string): string[] => {
+    if (!slots || slots.length === 0) return [];
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (dateStr > todayStr) return slots;
+    if (dateStr < todayStr) return [];
+
+    const now = new Date();
+    return slots.filter((time) => {
+      const parsed = parse(`${dateStr} ${time}`, 'yyyy-MM-dd hh:mm a', new Date());
+      if (isNaN(parsed.getTime())) return true;
+      return parsed.getTime() > now.getTime();
+    });
+  };
+
+  // ─── categorize
   const categorizeSlots = (slots: string[]) => {
     const morning: string[] = [];
     const afternoon: string[] = [];
@@ -209,32 +224,28 @@ const BookingPage: React.FC = () => {
     return { morning, afternoon, evening };
   };
 
-  // ─── Generate the next seven days for the date‐picker ─────────────────────────────────
   const generateDates = () => {
     const dates: { date: string; day: string; dayOfMonth: string; slots: number }[] = [];
-
     for (let i = 0; i < 7; i++) {
       const date = addDays(new Date(), i);
       const dateStr = format(date, 'yyyy-MM-dd');
+      const raw = availableSlotsByDate[dateStr] || [];
+      const afterTimeFilter = filterOutPastTimes(raw, dateStr);
+      const afterOccupiedFilter = filterOutOccupied(afterTimeFilter, dateStr);
+
       dates.push({
-        date:       dateStr,
-        day:        format(date, 'EEE'),
+        date: dateStr,
+        day: format(date, 'EEE'),
         dayOfMonth: format(date, 'd MMM'),
-        slots:      // count *filtered* slots, not raw:
-          (filterOutOccupied(availableSlotsByDate[dateStr] || [], dateStr)).length,
+        slots: afterOccupiedFilter.length,
       });
     }
     return dates;
   };
 
-  // ─── Move from “details” → “payment” (validation) ─────────────────────────────────
+  // ─── handle personal details submit
   const handlePersonalDetailsSubmit = () => {
-    if (
-      !personalDetails.firstName ||
-      !personalDetails.lastName ||
-      !personalDetails.dob ||
-      !personalDetails.phone
-    ) {
+    if (!personalDetails.firstName || !personalDetails.lastName || !personalDetails.dob || !personalDetails.phone) {
       alert('Please fill in all required fields');
       return;
     }
@@ -245,13 +256,11 @@ const BookingPage: React.FC = () => {
     setCurrentStep('payment');
   };
 
-  // ─── Determine the sessionPrice (₹ for 50-minute) ──────────────────────────────────
   const sessionPrice = selectedMode === 'online' ? onlinePrice50 : inPersonPrice50;
 
-  // ─── Handle Razorpay payment flow ─────────────────────────────────────────────────
+  // ─── handle payment flow (unchanged)
   const handlePayment = async () => {
     try {
-      // 1) Create a Booking record on the backend (status starts as “pending”)
       const bookingData = {
         adminId,
         user: {
@@ -265,69 +274,37 @@ const BookingPage: React.FC = () => {
           date:     selectedDate,
           timeSlot: selectedTime,
         },
-        status: 'pending', // we only finalize to “paid” after successful payment
+        status: 'pending',
       };
 
-      const bookingResp = await axios.post(
-        'http://localhost:5000/api/bookings',
-        bookingData,
-        { withCredentials: true }
-      );
-
+      const bookingResp = await axios.post('http://localhost:5000/api/bookings', bookingData, { withCredentials: true });
       const bookingId: string = bookingResp.data.bookingId;
-      if (!bookingId) {
-        throw new Error('Booking creation failed: no bookingId returned');
-      }
+      if (!bookingId) throw new Error('Booking creation failed: no bookingId returned');
 
-      // 2) Create Razorpay order on backend with that bookingId
-      const { data } = await axios.post(
-        'http://localhost:5000/api/payments/create-order',
-        {
-          bookingId,
-          amount: sessionPrice,
-        },
-        { withCredentials: true }
-      );
-
+      const { data } = await axios.post('http://localhost:5000/api/payments/create-order', { bookingId, amount: sessionPrice }, { withCredentials: true });
       const orderId: string = data.orderId;
-      if (!orderId) {
-        throw new Error('Create-order failed: no orderId returned');
-      }
+      if (!orderId) throw new Error('Create-order failed: no orderId returned');
 
-      // 3) Open Razorpay modal
       const options = {
         key:       'rzp_test_bJKekDM14mOARz',
-        amount:    sessionPrice * 100, // paise
+        amount:    sessionPrice * 100,
         currency:  'INR',
         name:      'Pilates Booking',
         description: 'Session booking',
         order_id:  orderId,
         handler: async (resp: any) => {
           try {
-            // 4) Verify payment on backend, passing bookingId
-            const verifyResp = await axios.post(
-              'http://localhost:5000/api/payments/verify',
-              {
-                razorpay_payment_id: resp.razorpay_payment_id,
-                razorpay_order_id:  resp.razorpay_order_id,
-                razorpay_signature: resp.razorpay_signature,
-                bookingId,
-              },
-              { withCredentials: true }
-            );
+            const verifyResp = await axios.post('http://localhost:5000/api/payments/verify', {
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_order_id:  resp.razorpay_order_id,
+              razorpay_signature: resp.razorpay_signature,
+              bookingId,
+            }, { withCredentials: true });
 
             if (verifyResp.data.success) {
-              // Mark payment as successful UI-side
               setPaymentSuccess(true);
               setCurrentStep('confirmation');
-
-              // **Remember** this slot + its direct neighbor as “occupied” so they won’t show next time
-              setOccupiedSlots((prev) => [
-                ...prev,
-                { date: selectedDate, time: selectedTime },
-              ]);
-
-              // Refresh all slots from backend (to keep data fresh, in case backend also closed that slot)
+              setOccupiedSlots((prev) => [...prev, { date: selectedDate, time: selectedTime }]);
               fetchAvailableSlots();
             } else {
               alert('Payment verification failed: ' + verifyResp.data.message);
@@ -337,10 +314,7 @@ const BookingPage: React.FC = () => {
             alert('Payment verification failed. Please try again.');
           }
         },
-        prefill: {
-          name:    `${personalDetails.firstName} ${personalDetails.lastName}`,
-          contact: personalDetails.phone,
-        },
+        prefill: { name: `${personalDetails.firstName} ${personalDetails.lastName}`, contact: personalDetails.phone },
         theme: { color: '#4F46E5' },
       };
 
@@ -351,163 +325,66 @@ const BookingPage: React.FC = () => {
     }
   };
 
-  // ─── Step-indicator UI ─────────────────────────────────────────────
   const renderStepIndicator = () => (
     <div className="flex items-center mb-8">
       <div className="flex items-center">
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'session'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-indigo-100 text-indigo-600'
-          }`}
-        >
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'session' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600'}`}>
           <Check size={16} />
         </div>
         <div className="ml-3">Choose session details</div>
       </div>
       <div className="flex-1 h-px bg-gray-300 mx-4"></div>
       <div className="flex items-center">
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'details'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-indigo-100 text-indigo-600'
-          }`}
-        >
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'details' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600'}`}>
           {currentStep === 'details' ? '2' : <Check size={16} />}
         </div>
         <div className="ml-3">Enter your details</div>
       </div>
       <div className="flex-1 h-px bg-gray-300 mx-4"></div>
       <div className="flex items-center">
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'payment' ? 'bg-indigo-600 text-white' : 'bg-gray-300'
-          }`}
-        >
-          3
-        </div>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'payment' ? 'bg-indigo-600 text-white' : 'bg-gray-300'}`}>3</div>
         <div className="ml-3">Complete booking</div>
       </div>
       <div className="flex-1 h-px bg-gray-300 mx-4"></div>
       <div className="flex items-center">
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'confirmation' ? 'bg-indigo-600 text-white' : 'bg-gray-300'
-          }`}
-        >
-          4
-        </div>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'confirmation' ? 'bg-indigo-600 text-white' : 'bg-gray-300'}`}>4</div>
         <div className="ml-3">Confirmation</div>
       </div>
     </div>
   );
 
-  // ─── Personal Details step ───────────────────────────────────────
   const renderPersonalDetailsStep = () => (
     <div className="space-y-6">
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Phone Number
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
           <div className="flex space-x-2">
-            <input
-              type="tel"
-              value={personalDetails.phone}
-              onChange={(e) =>
-                setPersonalDetails({ ...personalDetails, phone: e.target.value })
-              }
-              className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter your mobile number"
-            />
+            <input type="tel" value={personalDetails.phone} onChange={(e) => setPersonalDetails({ ...personalDetails, phone: e.target.value })} className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Enter your mobile number" />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              First Name
-            </label>
-            <input
-              type="text"
-              value={personalDetails.firstName}
-              onChange={(e) =>
-                setPersonalDetails({
-                  ...personalDetails,
-                  firstName: e.target.value,
-                })
-              }
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter your first name"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+            <input type="text" value={personalDetails.firstName} onChange={(e) => setPersonalDetails({ ...personalDetails, firstName: e.target.value })} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Enter your first name" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Last Name
-            </label>
-            <input
-              type="text"
-              value={personalDetails.lastName}
-              onChange={(e) =>
-                setPersonalDetails({
-                  ...personalDetails,
-                  lastName: e.target.value,
-                })
-              }
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter your last name"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+            <input type="text" value={personalDetails.lastName} onChange={(e) => setPersonalDetails({ ...personalDetails, lastName: e.target.value })} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Enter your last name" />
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Date of Birth
-          </label>
-          <input
-            type="date"
-            value={personalDetails.dob}
-            onChange={(e) =>
-              setPersonalDetails({ ...personalDetails, dob: e.target.value })
-            }
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+          <input type="date" value={personalDetails.dob} onChange={(e) => setPersonalDetails({ ...personalDetails, dob: e.target.value })} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
         </div>
-
         <div className="flex items-center">
-          <input
-            id="consent"
-            type="checkbox"
-            checked={consentChecked}
-            onChange={(e) => setConsentChecked(e.target.checked)}
-            className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-          />
-          <label htmlFor="consent" className="ml-2 text-sm text-gray-700">
-            I have read and agree to the{' '}
-            <a href="/consent-form" className="text-indigo-600 underline">
-              Consent Form
-            </a>
-          </label>
+          <input id="consent" type="checkbox" checked={consentChecked} onChange={(e) => setConsentChecked(e.target.checked)} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+          <label htmlFor="consent" className="ml-2 text-sm text-gray-700">I have read and agree to the <a href="/consent-form" className="text-indigo-600 underline">Consent Form</a></label>
         </div>
-
-        <button
-          onClick={handlePersonalDetailsSubmit}
-          disabled={
-            !personalDetails.firstName ||
-            !personalDetails.lastName ||
-            !personalDetails.dob ||
-            !personalDetails.phone ||
-            !consentChecked
-          }
-          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
-          Continue to Payment
-        </button>
+        <button onClick={handlePersonalDetailsSubmit} disabled={!personalDetails.firstName || !personalDetails.lastName || !personalDetails.dob || !personalDetails.phone || !consentChecked} className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed">Continue to Payment</button>
       </div>
     </div>
   );
 
-  // ─── Payment step ────────────────────────────────────────────────
   const renderPaymentStep = () => (
     <div className="space-y-6">
       <div className="bg-gray-50 p-4 rounded-lg">
@@ -521,65 +398,36 @@ const BookingPage: React.FC = () => {
         </div>
       </div>
       <div className="space-y-4">
-        <button
-          onClick={handlePayment}
-          className="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700"
-        >
-          Pay with Razorpay
-        </button>
+        <button onClick={handlePayment} className="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700">Pay with Razorpay</button>
       </div>
     </div>
   );
 
-  // ─── Confirmation step ───────────────────────────────────────────
   const renderConfirmationStep = () => (
     <div className="text-center">
       <h2 className="text-2xl font-medium mb-4">Booking Confirmed!</h2>
       <p className="text-gray-600">Your session has been successfully booked.</p>
       <div className="mt-6">
-        <button
-          onClick={() => {
-            // Reset selection so user can pick a fresh slot if they want
-            setSelectedTime('');
-            setCurrentStep('session');
-          }}
-          className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700"
-        >
-          Book Another Session
-        </button>
+        <button onClick={() => { setSelectedTime(''); setCurrentStep('session'); }} className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">Book Another Session</button>
       </div>
     </div>
   );
 
-  // ─── Compute the filtered “available slots” for the chosen date ─────────────────
-  const rawSlotsForDate = availableSlotsByDate[selectedDate] || [];
-  const filteredSlotsForDate = filterOutOccupied(rawSlotsForDate, selectedDate);
+  // Apply time & occupied filters
+  const rawSlotsForDateBeforeFilters = availableSlotsByDate[selectedDate] || [];
+  const rawSlotsForDateAfterTimeFilter = filterOutPastTimes(rawSlotsForDateBeforeFilters, selectedDate);
+  const filteredSlotsForDate = filterOutOccupied(rawSlotsForDateAfterTimeFilter, selectedDate);
 
-  // ─── Categorize the filtered slots into morning/afternoon/evening ─────────────
   const { morning, afternoon, evening } = categorizeSlots(filteredSlotsForDate);
 
-  // ─── “Pilates session with” info (static for now) ──────────────────────────────
-  const [selectedInstructor] = useState({
-    name: 'Nainika Makhija',
-    role: 'Senior Therapist',
-  });
+  const [selectedInstructor] = useState({ name: 'Nainika Makhija', role: 'Senior Therapist' });
 
-  // ─── Show loader if geo or fees are still loading ─────────────────────────────
   if (geoLoading || feesLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading…</p>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-600">Loading…</p></div>;
   }
 
-  // ─── Show error if fetching fees failed ───────────────────────────────────────
   if (feesError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-600">Error loading fees: {feesError}</p>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-red-600">Error loading fees: {feesError}</p></div>;
   }
 
   return (
@@ -589,11 +437,7 @@ const BookingPage: React.FC = () => {
           {renderStepIndicator()}
 
           <div className="flex items-center mb-8 pb-8 border-b border-gray-200">
-            <img
-              src="https://images.pexels.com/photos/5384534/pexels-photo-5384534.jpeg?auto=compress&cs=tinysrgb&w=1600"
-              alt={selectedInstructor.name}
-              className="w-12 h-12 rounded-full object-cover"
-            />
+            <img src="https://images.pexels.com/photos/5384534/pexels-photo-5384534.jpeg?auto=compress&cs=tinysrgb&w=1600" alt={selectedInstructor.name} className="w-12 h-12 rounded-full object-cover" />
             <div className="ml-4">
               <h2 className="text-lg font-medium">Pilates session with</h2>
               <p className="text-gray-600">{selectedInstructor.name}</p>
@@ -605,57 +449,13 @@ const BookingPage: React.FC = () => {
               <div className="mb-8">
                 <h3 className="text-lg font-medium mb-4">Mode of Session</h3>
                 <div className="grid grid-cols-3 gap-4">
-                  <button
-                    onClick={() => setSelectedMode('in-person')}
-                    className={`p-4 rounded-lg flex flex-col items-center justify-center border-2 transition-all ${
-                      selectedMode === 'in-person'
-                        ? 'border-indigo-600 bg-indigo-50'
-                        : 'border-gray-200 hover:border-indigo-600'
-                    }`}
-                  >
-                    <Users
-                      className={
-                        selectedMode === 'in-person'
-                          ? 'text-indigo-600'
-                          : 'text-gray-500'
-                      }
-                      size={24}
-                    />
-                    <span
-                      className={`mt-2 ${
-                        selectedMode === 'in-person'
-                          ? 'text-indigo-600'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      In-person
-                    </span>
+                  <button onClick={() => setSelectedMode('in-person')} className={`p-4 rounded-lg flex flex-col items-center justify-center border-2 transition-all ${selectedMode === 'in-person' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-indigo-600'}`}>
+                    <Users className={selectedMode === 'in-person' ? 'text-indigo-600' : 'text-gray-500'} size={24} />
+                    <span className={`mt-2 ${selectedMode === 'in-person' ? 'text-indigo-600' : 'text-gray-500'}`}>In-person</span>
                   </button>
-                  <button
-                    onClick={() => setSelectedMode('online')}
-                    className={`p-4 rounded-lg flex flex-col items-center justify-center border-2 transition-all ${
-                      selectedMode === 'online'
-                        ? 'border-indigo-600 bg-indigo-50'
-                        : 'border-gray-200 hover:border-indigo-600'
-                    }`}
-                  >
-                    <Monitor
-                      className={
-                        selectedMode === 'online'
-                          ? 'text-indigo-600'
-                          : 'text-gray-500'
-                      }
-                      size={24}
-                    />
-                    <span
-                      className={`mt-2 ${
-                        selectedMode === 'online'
-                          ? 'text-indigo-600'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      Video call
-                    </span>
+                  <button onClick={() => setSelectedMode('online')} className={`p-4 rounded-lg flex flex-col items-center justify-center border-2 transition-all ${selectedMode === 'online' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-indigo-600'}`}>
+                    <Monitor className={selectedMode === 'online' ? 'text-indigo-600' : 'text-gray-500'} size={24} />
+                    <span className={`mt-2 ${selectedMode === 'online' ? 'text-indigo-600' : 'text-gray-500'}`}>Video call</span>
                   </button>
                 </div>
                 <p className="mt-4 text-gray-600">Session Price: ₹{sessionPrice}</p>
@@ -664,32 +464,17 @@ const BookingPage: React.FC = () => {
               <div className="mb-8">
                 <h3 className="text-lg font-medium mb-4">Date and Time</h3>
                 <div className="flex items-center justify-between mb-6">
-                  <button className="p-2 hover:bg-gray-100 rounded-full">
-                    <ArrowLeft size={20} />
-                  </button>
+                  <button className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft size={20} /></button>
                   <div className="flex space-x-4">
                     {generateDates().map((date) => (
-                      <button
-                        key={date.date}
-                        onClick={() => {
-                          setSelectedDate(date.date);
-                          setSelectedTime('');
-                        }}
-                        className={`p-3 rounded-lg text-center min-w-[80px] transition-all ${
-                          selectedDate === date.date
-                            ? 'bg-indigo-600 text-white'
-                            : 'hover:bg-gray-100'
-                        }`}
-                      >
+                      <button key={date.date} onClick={() => { setSelectedDate(date.date); setSelectedTime(''); }} className={`p-3 rounded-lg text-center min-w-[80px] transition-all ${selectedDate === date.date ? 'bg-indigo-600 text-white' : 'hover:bg-gray-100'}`}>
                         <div className="text-sm">{date.day}</div>
                         <div className="font-medium">{date.dayOfMonth}</div>
                         <div className="text-xs mt-1">{date.slots} slots available</div>
                       </button>
                     ))}
                   </div>
-                  <button className="p-2 hover:bg-gray-100 rounded-full">
-                    <ArrowRight size={20} />
-                  </button>
+                  <button className="p-2 hover:bg-gray-100 rounded-full"><ArrowRight size={20} /></button>
                 </div>
 
                 <div className="space-y-6">
@@ -697,73 +482,67 @@ const BookingPage: React.FC = () => {
                     <div>
                       <h4 className="text-sm font-medium text-gray-600 mb-3">Morning</h4>
                       <div className="grid grid-cols-4 gap-3">
-                        {morning.map((time) => (
-                          <button
-                            key={time}
-                            onClick={() => setSelectedTime(time)}
-                            className={`py-2 px-4 rounded-lg text-center border transition-all ${
-                              selectedTime === time
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'border-gray-200 hover:border-indigo-600'
-                            }`}
-                          >
-                            {time}
-                          </button>
-                        ))}
+                        {morning.map((time) => {
+                          const minsUntil = minutesUntil(selectedDate, time);
+                          const within5 = minsUntil <= 5 && minsUntil >= 0;
+                          const within30 = minsUntil <= 30 && minsUntil > 5;
+                          const disabled = within5;
+                          const warning = within30;
+
+                          return (
+                            <button key={time} onClick={() => !disabled && setSelectedTime(time)} disabled={disabled} className={`py-2 px-4 rounded-lg text-center border transition-all ${selectedTime === time ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 hover:border-indigo-600'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${warning && !disabled ? 'ring-2 ring-yellow-300' : ''}`} title={disabled ? 'This slot starts within 5 minutes and cannot be booked' : (warning ? 'This slot starts within 30 minutes' : '')}>{time}</button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
+
                   {afternoon.length > 0 && (
                     <div>
                       <h4 className="text-sm font-medium text-gray-600 mb-3">Afternoon</h4>
                       <div className="grid grid-cols-4 gap-3">
-                        {afternoon.map((time) => (
-                          <button
-                            key={time}
-                            onClick={() => setSelectedTime(time)}
-                            className={`py-2 px-4 rounded-lg text-center border transition-all ${
-                              selectedTime === time
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'border-gray-200 hover:border-indigo-600'
-                            }`}
-                          >
-                            {time}
-                          </button>
-                        ))}
+                        {afternoon.map((time) => {
+                          const minsUntil = minutesUntil(selectedDate, time);
+                          const within5 = minsUntil <= 5 && minsUntil >= 0;
+                          const within30 = minsUntil <= 30 && minsUntil > 5;
+                          const disabled = within5;
+                          const warning = within30;
+
+                          return (
+                            <button key={time} onClick={() => !disabled && setSelectedTime(time)} disabled={disabled} className={`py-2 px-4 rounded-lg text-center border transition-all ${selectedTime === time ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 hover:border-indigo-600'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${warning && !disabled ? 'ring-2 ring-yellow-300' : ''}`} title={disabled ? 'This slot starts within 5 minutes and cannot be booked' : (warning ? 'This slot starts within 30 minutes' : '')}>{time}</button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
+
                   {evening.length > 0 && (
                     <div>
                       <h4 className="text-sm font-medium text-gray-600 mb-3">Evening</h4>
                       <div className="grid grid-cols-4 gap-3">
-                        {evening.map((time) => (
-                          <button
-                            key={time}
-                            onClick={() => setSelectedTime(time)}
-                            className={`py-2 px-4 rounded-lg text-center border transition-all ${
-                              selectedTime === time
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'border-gray-200 hover:border-indigo-600'
-                            }`}
-                          >
-                            {time}
-                          </button>
-                        ))}
+                        {evening.map((time) => {
+                          const minsUntil = minutesUntil(selectedDate, time);
+                          const within5 = minsUntil <= 5 && minsUntil >= 0;
+                          const within30 = minsUntil <= 30 && minsUntil > 5;
+                          const disabled = within5;
+                          const warning = within30;
+
+                          return (
+                            <button key={time} onClick={() => !disabled && setSelectedTime(time)} disabled={disabled} className={`py-2 px-4 rounded-lg text-center border transition-all ${selectedTime === time ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 hover:border-indigo-600'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${warning && !disabled ? 'ring-2 ring-yellow-300' : ''}`} title={disabled ? 'This slot starts within 5 minutes and cannot be booked' : (warning ? 'This slot starts within 30 minutes' : '')}>{time}</button>
+                          );
+                        })}
                       </div>
                     </div>
+                  )}
+
+                  {morning.length === 0 && afternoon.length === 0 && evening.length === 0 && (
+                    <div className="text-center text-gray-500">No time slots available for the selected date.</div>
                   )}
                 </div>
               </div>
 
               <div className="flex justify-end">
-                <button
-                  disabled={!selectedMode || !selectedDate || !selectedTime}
-                  onClick={() => setCurrentStep('details')}
-                  className="bg-indigo-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
-                  Continue
-                </button>
+                <button disabled={!selectedMode || !selectedDate || !selectedTime} onClick={() => setCurrentStep('details')} className="bg-indigo-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">Continue</button>
               </div>
             </>
           )}

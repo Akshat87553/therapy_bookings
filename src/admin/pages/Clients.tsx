@@ -25,6 +25,9 @@ const Clients: React.FC = () => {
         const res = await fetch('http://localhost:5000/api/users', {
           credentials: 'include',
         });
+        if (res.status === 401 || res.status === 403) {
+            throw new Error('Unauthorized access. Please log in as an admin.');
+        }
         if (!res.ok) {
           throw new Error('Failed to fetch users');
         }
@@ -32,7 +35,7 @@ const Clients: React.FC = () => {
         setUsers(data);
       } catch (err: any) {
         console.error(err);
-        setError('Failed to load clients');
+        setError(err.message || 'Failed to load clients');
       } finally {
         setLoading(false);
       }
@@ -40,8 +43,14 @@ const Clients: React.FC = () => {
     fetchUsers();
   }, []);
 
+  const handleClientClick = (email: string) => {
+    // FIX: Navigates to the correct, updated route.
+    navigate(`/admin/clients/${email}`);
+  };
+
   const filteredUsers = users.filter((u) =>
-    u.name.toLowerCase().includes(searchTerm.toLowerCase())
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -81,9 +90,7 @@ const Clients: React.FC = () => {
               {filteredUsers.map((user) => (
                 <div
                   key={user._id}
-                  onClick={() =>
-                    navigate(`/admin/clients/${user.email}/sessions`)
-                  }
+                  onClick={() => handleClientClick(user.email)}
                   className="cursor-pointer"
                 >
                   <ClientCard

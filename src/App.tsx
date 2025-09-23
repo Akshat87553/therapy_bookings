@@ -6,6 +6,7 @@ import {
   Route,
   Navigate,
   Outlet,
+  useLocation,
 } from 'react-router-dom';
 import { useAuth, AuthProvider } from './context/AuthContext';
 
@@ -58,119 +59,102 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, user } = useAuth();
   return isAuthenticated && user?.role === 'admin'
     ? <>{children}</>
-    : <Navigate to="/admin" replace />;
+    : <Navigate to="/login" replace />; // Redirect to general login
 };
 
-const isAdminRoute = location.pathname.startsWith('/admin');
-const isBookingPage = location.pathname.startsWith('/book');
-const isRegisterPage = location.pathname.startsWith('/login');
-const isLoginPage = location.pathname.startsWith('/register');
-const isBookingHistoryPage = location.pathname.startsWith('/bookings');
-
-
-
 function AppContent() {
+  const location = useLocation();
   useEffect(() => {
     AOS.init({ duration: 1000, once: true, easing: 'ease-in-out' });
     document.title = 'Nainika Therapy';
   }, []);
 
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const isAuthPage = location.pathname.startsWith('/login') || location.pathname.startsWith('/register');
+  const showNavAndFooter = !isAdminRoute && !isAuthPage;
+
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        <ScrollToTop>
-          <div className="font-sans">
-            {!isAdminRoute && !isBookingPage && !isRegisterPage && !isLoginPage && <Navbar />}
-            <Routes>
-              {/* Public */}
-              <Route path="/login" element={<LoginForm />} />
-              <Route path="/register" element={<RegisterForm />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route
-                path="/"
-                element={
-                  <>
-                    <Hero /> <About /> <Classes /> <Instructors />
-                    <Testimonials /> <FAQ /> <Contact />
-                  </>
-                }
-              />
+    <div className="min-h-screen flex flex-col">
+      <ScrollToTop>
+        <div className="font-sans">
+          {showNavAndFooter && <Navbar />}
+          <Routes>
+            {/* Public */}
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/register" element={<RegisterForm />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route
+              path="/"
+              element={
+                <>
+                  <Hero /> <About /> <Classes /> <Instructors />
+                  <Testimonials /> <FAQ /> <Contact />
+                </>
+              }
+            />
 
-              {/* Authenticated users */}
-              <Route
-                path="/book"
-                element={
-                  <AuthRoute>
-                    <BookingPage />
-                  </AuthRoute>
-                }
-              />
-              <Route path="/bookings" element={
+            {/* Authenticated users */}
+            <Route
+              path="/book"
+              element={
                 <AuthRoute>
-                  <BookingHistory />
+                  <BookingPage />
                 </AuthRoute>
-              } />
+              }
+            />
+            <Route path="/bookings" element={
+              <AuthRoute>
+                <BookingHistory />
+              </AuthRoute>
+            } />
 
-                      {/* ═══════ Admin area (one parent with nested children) ═══════ */}
-        <Route
-          path="/admin/*"
-          element={
-            <AdminRoute>
-              <div className="admin-panel">
-                <Layout>
-                  {/* Outlet is where nested admin pages will render */}
-                  <Outlet />
-                </Layout>
-              </div>
-            </AdminRoute>
-          }
-        >
-          {/* “index” means “/admin” exactly → Dashboard */}
-          <Route index element={<Dashboard />} />
+            {/* ═══════ Admin area (one parent with nested children) ═══════ */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <Layout>
+                    <Outlet />
+                  </Layout>
+                </AdminRoute>
+              }
+            >
+              {/* index means "/admin" exactly → Dashboard */}
+              <Route index element={<Dashboard />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              
+              {/* Other admin routes */}
+              <Route path="bookings/edit/:id" element={<BookingDetails />} />
+              <Route path="bookings/create" element={<AdminCreateSessionPage />} />
+              <Route path="availability" element={<Availability />} />
+              
+              <Route path="clients" element={<Clients />} />
+              {/* FIX: Changed route param from :id to :email to match component logic */}
+              <Route path="clients/:email" element={<ClientDetail />} />
 
-          {/* /admin/bookings/edit/:id */}
-          <Route path="bookings/edit/:id" element={<BookingDetails />} />
+              <Route path="fees" element={<Fees />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="notifications" element={<Notifications />} />
+              <Route path="profile" element={<Profile />} />
+            </Route>
 
-          {/* /admin/bookings/create */}
-          <Route path="bookings/create" element={<AdminCreateSessionPage />} />
-
-          {/* /admin/availability */}
-          <Route path="availability" element={<Availability />} />
-
-          {/* /admin/clients */}
-          <Route index={false} /> {/* (no-op; just here for clarity) */}
-          <Route path="clients" element={<Clients />} />
-          <Route path="clients/:id" element={<ClientDetail />} />
-
-          {/* /admin/fees */}
-          <Route path="fees" element={<Fees />} />
-
-          {/* /admin/analytics */}
-          <Route path="analytics" element={<Analytics />} />
-
-          {/* /admin/notifications */}
-          <Route path="notifications" element={<Notifications />} />
-
-          {/* /admin/profile */}
-          <Route path="profile" element={<Profile />} />
-        </Route>
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-
-          </div>
-        </ScrollToTop>
-        {!isAdminRoute && !isBookingPage && !isRegisterPage && !isLoginPage && isBookingHistoryPage && <Footer />}
-      </div>
-    </Router>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          {showNavAndFooter && <Footer />}
+        </div>
+      </ScrollToTop>
+    </div>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Router>
   );
 }

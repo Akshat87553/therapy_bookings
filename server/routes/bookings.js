@@ -1,6 +1,6 @@
 // server/routes/bookings.js
 import express from 'express';
-import Booking from '../models/Booking.js';
+import Booking from '../models/booking.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import Notification from '../models/notification.js'; 
 

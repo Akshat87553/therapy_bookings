@@ -1,7 +1,7 @@
 // routes/users.js
 import express from 'express';
 import User from '../models/User.js';
-import Booking from '../models/Booking.js';
+import Booking from '../models/booking.js';
 import { authenticateToken, authenticateAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();

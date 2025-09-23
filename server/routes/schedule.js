@@ -20,35 +20,47 @@ async function cleanupPastSlots(adminId) {
 }
 
 /**
- * Public (authenticated) endpoint for fetching available slots for a single admin.
- * GET /api/schedule/available-slots?start=&end=
+ * PUBLIC endpoint for fetching available slots for a single admin.
+ * GET /api/schedule/available-slots?adminId=...&start=YYYY-MM-DD&end=YYYY-MM-DD
  *
- * Before returning, we delete any Schedule entries before today.
+ * - If adminId query param is present, it will be used.
+ * - Otherwise falls back to process.env.ADMIN_ID.
+ * - No authentication required (so booking page can use it). If you want auth, re-add middleware.
  */
 router.get(
   '/available-slots',
-  authenticateToken,
   async (req, res) => {
     try {
-      const ADMIN_ID = process.env.ADMIN_ID; // e.g. "682fa52d899e328f422b6851"
+      // Prefer adminId from query param (so public clients can request availability for that admin).
+      const adminIdFromQuery = req.query.adminId;
+      const ADMIN_ID = adminIdFromQuery || process.env.ADMIN_ID;
+
       if (!ADMIN_ID) {
-        return res.status(400).json({ message: 'No ADMIN_ID configured' });
+        return res.status(400).json({ message: 'No ADMIN_ID configured and no adminId query parameter provided' });
       }
 
-      // 1) Remove past slots for this admin
-      await cleanupPastSlots(ADMIN_ID);
-
+      // Validate start & end
       const { start, end } = req.query;
       if (!start || !end) {
         return res.status(400).json({ message: 'Missing start or end query parameter' });
       }
 
+      // Normalize start/end into Date objects
+      const startDate = new Date(String(start));
+      const endDate = new Date(String(end));
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return res.status(400).json({ message: 'Invalid start or end date format. Use YYYY-MM-DD' });
+      }
+
+      // 1) Remove past slots for this admin
+      await cleanupPastSlots(ADMIN_ID);
+
       // 2) Fetch schedules in [start, end]
       const availabilities = await Schedule.find({
         adminId: ADMIN_ID,
         date: {
-          $gte: new Date(start),
-          $lte: new Date(end)
+          $gte: startDate,
+          $lte: endDate
         }
       });
 
@@ -177,6 +189,82 @@ router.post(
     } catch (err) {
       console.error('Error in POST /api/schedule/availability:', err);
       return res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+
+/**
+ * Admin-only: bulk update availability for a day (add/remove many slots).
+ * POST /api/schedule/availability/bulk
+ *
+ * Payload: { date, day_of_week, time_slots: [...], slot_type, is_available }
+ */
+router.post(
+  '/availability/bulk',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const { date, day_of_week, time_slots, slot_type, is_available } = req.body;
+      if (!date || !Array.isArray(time_slots) || typeof is_available !== 'boolean' || !slot_type) {
+        return res.status(400).json({ message: 'Missing required fields for bulk update' });
+      }
+
+      const dayDate = new Date(date);
+      dayDate.setUTCHours(0, 0, 0, 0);
+
+      let availability = await Schedule.findOne({ adminId, date: dayDate });
+
+      if (!availability && is_available) {
+        // If no schedule exists for this day and we are marking as available, create it.
+        availability = new Schedule({
+          adminId,
+          date: dayDate,
+          dayOfWeek: day_of_week,
+          slots: time_slots.map(time => ({
+            time: time,
+            isAvailable: true,
+            slotType: slot_type
+          }))
+        });
+      } else if (availability) {
+        // If a schedule exists, update it
+        time_slots.forEach(time_slot => {
+          const idx = availability.slots.findIndex(s => s.time === time_slot);
+          if (idx !== -1) {
+            // If the slot exists, update its availability and type
+            availability.slots[idx].isAvailable = is_available;
+            availability.slots[idx].slotType = slot_type;
+          } else if (is_available) {
+            // If the slot doesn't exist but should be available, add it
+            availability.slots.push({
+              time: time_slot,
+              isAvailable: true,
+              slotType: slot_type
+            });
+          }
+        });
+        
+        // If un-selecting, remove the slots from the array
+        if (!is_available) {
+            availability.slots = availability.slots.filter(s => !time_slots.includes(s.time));
+        }
+
+        // If no slots remain for the day, delete the whole document
+        if (availability.slots.length === 0) {
+            await Schedule.deleteOne({ _id: availability._id });
+            return res.json({ message: 'Availability removed for the day' });
+        }
+      } else {
+        // No schedule exists and we are un-selecting, so no action is needed.
+        return res.json({ message: 'No action needed' });
+      }
+
+      await availability.save();
+      return res.json({ message: 'Availability updated in bulk' });
+    } catch (err) {
+      console.error('Error in POST /api/schedule/availability/bulk:', err);
+      return res.status(500).json({ message: 'Server error during bulk update' });
     }
   }
 );

@@ -69,7 +69,8 @@ router.post('/login', async (req, res) => {
 // Register Route
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, phone, role } = req.body;
+    // FIX: Removed `role` from destructuring to prevent privilege escalation.
+    const { name, email, password, phone } = req.body;
     console.log('Register request body:', req.body);
 
     const existingUser = await User.findOne({ email });
@@ -77,34 +78,29 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Only allow 'admin' role if explicitly authorized (secure this in production)
-    const userRole = role == 'admin' ? 'admin' : 'user';; // In production, add proper authorization
-
     const user = new User({
       name,
       email,
       password, // Handled by pre-save hook
       phone,
-      role: userRole,
+      role: 'user', // FIX: Role is hardcoded to 'user' for security.
     });
      console.log('🐛  New User doc before save:', user);
      await user.save();
       console.log('🐛  Saved User:', user);
 
-     await user.save();
-
-      const admins = await User.find({ role: 'admin' }).select('_id');
-    const notifications = admins.map(a => ({
-      adminId: a._id,
-      type: 'new_user',
-      title: 'New client registered',
-      message: `${user.name} just registered.`,
-    }));
-
-    await Notification.insertMany(notifications);
-
+    // Notify admins about the new user registration
+    const admins = await User.find({ role: 'admin' }).select('_id');
+    if (admins.length > 0) {
+      const notifications = admins.map(a => ({
+        adminId: a._id,
+        type: 'new_user',
+        title: 'New client registered',
+        message: `${user.name} just registered.`,
+      }));
+      await Notification.insertMany(notifications);
+    }
     
-
      const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
@@ -140,7 +136,8 @@ router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      // Return a generic message to prevent user enumeration
+      return res.json({ message: 'If a user with that email exists, a password reset link has been sent.' });
     }
 
     // Generate reset token
