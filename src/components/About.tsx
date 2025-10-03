@@ -39,7 +39,7 @@ const About: React.FC = () => {
           </div>
 
           {/* RIGHT: Two columns of body text */}
-          <div className=" mt-4 lg:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-12 text-neutral-800">
+          <div className=" mt-4 lg:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-12 text-neutral-800 font-bold">
             <p className="text-base leading-relaxed">
               Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
             </p>

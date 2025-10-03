@@ -8,6 +8,15 @@ export default {
   ],
   theme: {
     extend: {
+          animation: {
+        marquee: 'marquee 60s linear infinite',
+      },
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+      },
       fontFamily: {
  display: ['Playfair Display', 'serif'],   // for section titles, h1–h6
         sans: ['Montserrat', 'sans-serif'],         // override default

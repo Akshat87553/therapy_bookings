@@ -33,9 +33,9 @@ const Contact: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="max-w-6xl mx-auto text-center mb-16" data-aos="fade-up" data-aos-duration="1000">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-6">
-            Get In <span className="text-green-600">Touch</span>
+            Get In <span className="text-[#6699CC] font-bold">Touch</span>
           </h2>
-          <div className="w-20 h-1 bg-green-600 mx-auto mb-8"></div>
+          <div className="w-20 h-1 bg-[#6699CC] mx-auto mb-8"></div>
           <p className="text-gray-600 max-w-3xl mx-auto">
             Have questions or ready to start your Pilates journey? Contact us today to learn more about our classes or to schedule your first session.
           </p>
@@ -48,8 +48,8 @@ const Contact: React.FC = () => {
               
               <div className="space-y-6">
                 <div className="flex items-start">
-                  <div className="bg-green-100 p-3 rounded-full mr-4">
-                    <MapPin className="text-green-600" size={24} />
+                  <div className="bg-[#6699CC] p-3 rounded-full mr-4">
+                    <MapPin className="text-[#6699CC]-600" size={24} />
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-800 mb-1">Studio Location</h4>
@@ -58,22 +58,22 @@ const Contact: React.FC = () => {
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-green-100 p-3 rounded-full mr-4">
-                    <Mail className="text-green-600" size={24} />
+                  <div className="bg-[#6699CC] p-3 rounded-full mr-4">
+                    <Mail className="text-[#6699CC]-600" size={24} />
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-800 mb-1">Email Us</h4>
-                    <a href="mailto:info@purepilates.com" className="text-green-600 hover:underline">info@purepilates.com</a>
+                    <a href="mailto:info@purepilates.com" className="text-[#6699CC] hover:underline font-bold">info@purepilates.com</a>
                   </div>
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-green-100 p-3 rounded-full mr-4">
-                    <Phone className="text-green-600" size={24} />
+                  <div className="bg-[#6699CC] p-3 rounded-full mr-4">
+                    <Phone className="text-[#6699CC]-600" size={24} />
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-800 mb-1">Call Us</h4>
-                    <a href="tel:+12125551234" className="text-green-600 hover:underline">(212) 555-1234</a>
+                    <a href="tel:+12125551234" className="text-[#6699CC] hover:underline font-bold">(212) 555-1234</a>
                   </div>
                 </div>
               </div>
@@ -111,7 +111,7 @@ const Contact: React.FC = () => {
                   value={formData.name}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6699CC]-500"
                 />
               </div>
               
@@ -125,7 +125,7 @@ const Contact: React.FC = () => {
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6699CC]-500"
                   />
                 </div>
                 <div>
@@ -136,7 +136,7 @@ const Contact: React.FC = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6699CC]-500"
                   />
                 </div>
               </div>
@@ -148,7 +148,7 @@ const Contact: React.FC = () => {
                   name="interest"
                   value={formData.interest}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6699CC]-500"
                 >
                   <option value="mat-pilates">Mat Pilates</option>
                   <option value="reformer-pilates">Reformer Pilates</option>
@@ -167,41 +167,19 @@ const Contact: React.FC = () => {
                   onChange={handleChange}
                   rows={5}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#6699CC]-500"
                   placeholder="Tell us about your goals or any questions you have..."
                 ></textarea>
               </div>
               
               <button 
                 type="submit" 
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-md font-medium transition-colors duration-300"
+                className="bg-[#6699CC] hover:bg-[#6699CC]-900 text-white px-6 py-3 rounded-md font-bold transition-colors duration-300"
               >
                 Send Message
               </button>
             </form>
           </div>
-        </div>
-        {/* Flower divider */}
-        <div className="mt-16 flex items-center justify-center" data-aos="fade-up" data-aos-duration="1000">
-          <div className="flex-grow border-t border-gray-300"></div>
-          <div className="mx-4 text-green-600 animate-pulse">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 64 64"
-              fill="currentColor"
-              className="w-8 h-8"
-            >
-              {/* Center circle */}
-              <circle cx="32" cy="32" r="6" />
-              {/* Petals */}
-              <path d="M32 12c-4 0-8 4-8 8s4 8 8 8 8-4 8-8-4-8-8-8z" />
-              <path d="M12 32c0-4 4-8 8-8s8 4 8 8-4 8-8 8-8-4-8-8z" />
-              <path d="M32 52c-4 0-8-4-8-8s4-8 8-8 8 4 8 8-4 8-8 8z" />
-              <path d="M52 32c0-4-4-8-8-8s-8 4-8 8 4 8 8 8 8-4 8-8z" />
-              <path d="M20 20c-3-3-6-3-8 0s-3 6 0 8 6 3 8 0 3-6 0-8z" />
-            </svg>
-          </div>
-          <div className="flex-grow border-t border-gray-300"></div>
         </div>
       </div>
     </section>

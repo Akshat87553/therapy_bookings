@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex flex-wrap justify-between">
           <div className="w-full md:w-1/4 mb-8 md:mb-0">
-            <h2 className="text-2xl font-medium mb-6">PurePilates</h2>
+            <h2 className="text-2xl font-medium mb-6">TheraSync</h2>
             <p className="text-gray-400 mb-6 leading-relaxed">
               Transform your body and mind through the power of Pilates. Join our community 
               and experience the benefits of controlled movement and mindful exercise.
