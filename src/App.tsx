@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useEffect } from 'react';
 import {
   BrowserRouter as Router,
@@ -26,7 +25,8 @@ import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import ForgotPassword from './context/ForgotPassword';
 import AboutPage from './components/AboutPage';
-
+import Profile from './components/Profile';
+import BookingHistory from './components/BookingHistory';
 
 import Dashboard from './admin/pages/Dashboard';
 import Clients from './admin/pages/Clients';
@@ -35,10 +35,9 @@ import Analytics from './admin/pages/Analytics';
 import Availability from './admin/pages/Availability';
 import Fees from './admin/pages/Fees';
 import Notifications from './admin/pages/Notifications';
-import Profile from './admin/pages/Profile';
+import AdminProfile from './admin/pages/Profile';
 import Layout from './admin/components/layout/Layout';
 import BookingDetails from './admin/components/dashboard/BookingDetails';
-import BookingHistory from './components/BookingHistory';
 import AdminCreateSessionPage from './admin/components/dashboard/AdminSessionPage';
 
 
@@ -95,6 +94,11 @@ function AppContent() {
             />
 
             {/* Authenticated users */}
+            <Route path="/profile" element={
+              <AuthRoute>
+                <Profile />
+              </AuthRoute>
+            } />
             <Route
               path="/book"
               element={
@@ -136,7 +140,7 @@ function AppContent() {
               <Route path="fees" element={<Fees />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="notifications" element={<Notifications />} />
-              <Route path="profile" element={<Profile />} />
+              <Route path="profile" element={<AdminProfile />} />
             </Route>
 
             {/* Fallback */}

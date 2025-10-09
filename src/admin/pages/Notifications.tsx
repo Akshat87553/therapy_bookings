@@ -36,7 +36,7 @@ const Notifications: React.FC = () => {
     const fetchNotifications = async () => {
       try {
         const res = await axios.get<Notification[]>(
-          'http://localhost:5000/api/notifications',
+          '/api/notifications',
           { withCredentials: true }
         );
         setNotifications(res.data);
@@ -53,7 +53,7 @@ const Notifications: React.FC = () => {
   const markAllAsRead = async () => {
     try {
       await axios.put(
-        'http://localhost:5000/api/notifications/read-all',
+        '/api/notifications/read-all',
         {},
         { withCredentials: true }
       );
@@ -68,7 +68,7 @@ const Notifications: React.FC = () => {
   const markOneAsRead = async (id: string) => {
     try {
       await axios.put(
-        `http://localhost:5000/api/notifications/${id}/read`,
+        `/api/notifications/${id}/read`,
         {},
         { withCredentials: true }
       );

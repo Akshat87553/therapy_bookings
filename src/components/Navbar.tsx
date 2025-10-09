@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X, Instagram, Facebook } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { motion } from 'framer-motion';
 import logo from './templetes/template8-logo-01.png';
 
 const Navbar: React.FC = () => {
@@ -17,7 +18,6 @@ const Navbar: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     const original = document.body.style.overflow;
     document.body.style.overflow = isOpen ? 'hidden' : original;
@@ -26,7 +26,6 @@ const Navbar: React.FC = () => {
     };
   }, [isOpen]);
 
-  // Close menu on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsOpen(false);
@@ -63,7 +62,6 @@ const Navbar: React.FC = () => {
     navigate('/');
   };
 
-  // Desktop center links
   const centerLinks = [
     { label: 'Home', action: () => handleNavClick('/') },
     { label: 'About', action: () => handleNavClick('/about') },
@@ -78,9 +76,7 @@ const Navbar: React.FC = () => {
       <nav
         role="navigation"
         aria-label="Main"
-        className={`fixed inset-x-0 top-0 z-50 transition-all` 
-          
-        }
+        className={`fixed inset-x-0 top-0 z-50 transition-all`}
       >
         <div className="relative flex items-center justify-between w-full px-6 md:px-8 py-4">
           {/* Left: Logo */}
@@ -88,10 +84,13 @@ const Navbar: React.FC = () => {
             <img src={logo} alt="Logo" className="h-12 w-auto ml-1" />
           </Link>
 
-          {/* Center: Desktop Menu */}
+          {/* Center: Desktop Menu
+              pointer-events-none prevents the container from capturing clicks outside the buttons.
+              Each button gets pointer-events-auto so it's still interactable.
+          */}
           <div
             className="hidden md:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2
-                       space-x-8 text-white uppercase tracking-wide select-none"
+                       space-x-8 text-white uppercase tracking-wide select-none pointer-events-none"
             aria-hidden={false}
           >
             {centerLinks.map((item) =>
@@ -99,7 +98,7 @@ const Navbar: React.FC = () => {
                 <button
                   key={item.label}
                   onClick={item.action}
-                  className="hover:underline text-white"
+                  className="hover:underline text-white pointer-events-auto"
                   type="button"
                 >
                   {item.label.toLowerCase()}
@@ -108,7 +107,7 @@ const Navbar: React.FC = () => {
                 <button
                   key={item.label}
                   onClick={() => scrollToSection(item.id!)}
-                  className="hover:underline text-white"
+                  className="hover:underline text-white pointer-events-auto"
                   type="button"
                 >
                   {item.label.toLowerCase()}
@@ -117,8 +116,10 @@ const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Right: Auth / Social (desktop) */}
-          <div className="hidden md:flex items-center space-x-4 text-white">
+          {/* Right: Auth / Social (desktop)
+              z-60 to guarantee it's above the centered menu for both visuals & pointer events.
+          */}
+          <div className="hidden md:flex items-center space-x-4 text-white z-60">
             <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="hover:opacity-80">
               <Instagram size={18} />
             </a>
@@ -128,12 +129,21 @@ const Navbar: React.FC = () => {
 
             {isAuthenticated ? (
               <>
-                <Link to="/book" className="border border-white px-4 py-2 rounded-full font-semibold hover:bg-white hover:text-blue-900 transition">
+                <Link to="/book" className="border border-white px-4 py-2 rounded-full font-semibold hover:bg-white hover:text-blue-900 transition" onClick={() => setIsOpen(false)}>
                   Book Session
                 </Link>
-                <Link to="/bookings" className="hover:underline">
+                <Link to="/bookings" className="hover:underline" onClick={() => setIsOpen(false)}>
                   My Bookings
                 </Link>
+
+                <Link
+                  to="/profile"
+                  className="hover:underline"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Profile
+                </Link>
+
                 <button onClick={handleLogout} className="hover:underline">
                   Logout
                 </button>
@@ -150,7 +160,7 @@ const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Mobile Toggle - always visible, with background and z-index */}
+          {/* Mobile Toggle */}
           <button
             onClick={toggleMenu}
             className="md:hidden z-50 p-2 rounded-full bg-black/50 hover:bg-black/60 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white"
@@ -164,47 +174,56 @@ const Navbar: React.FC = () => {
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay */}
-      <div
-        id="mobile-menu"
-        role="dialog"
-        aria-modal="true"
-        aria-hidden={!isOpen}
-        // pointer-events-none when closed prevents overlay blocking the toggle
-        className={`fixed inset-0 z-40 flex flex-col justify-between p-6 bg-white text-gray-900 transform transition-transform duration-400 ease-in-out md:hidden ${
-          isOpen ? 'translate-x-0 pointer-events-auto' : 'translate-x-full pointer-events-none'
-        }`}
-      >
-        {/* Top: Logo + Close */}
-        <div className="flex items-center justify-between">
-          <Link to="/" onClick={() => setIsOpen(false)}>
-            <img src={logo} alt="Logo" className="h-10 w-auto" />
-          </Link>
-          <button onClick={toggleMenu} aria-label="Close menu" type="button" className="p-2">
-            <X size={28} />
-          </button>
-        </div>
-
-        {/* Middle: Home, About, and in-page links */}
-        <div className="flex flex-col items-center mt-8 space-y-6">
-          <button onClick={() => handleNavClick('/')} className="text-2xl font-light uppercase tracking-widest" type="button">Home</button>
-          <button onClick={() => handleNavClick('/about')} className="text-2xl font-light uppercase tracking-widest" type="button">About</button>
-          <button onClick={() => scrollToSection('classes')} className="text-2xl font-light uppercase tracking-widest" type="button">Classes</button>
-          <button onClick={() => scrollToSection('instructors')} className="text-2xl font-light uppercase tracking-widest" type="button">Instructors</button>
-          <button onClick={() => scrollToSection('testimonials')} className="text-2xl font-light uppercase tracking-widest" type="button">Testimonials</button>
-          <button onClick={() => scrollToSection('contact')} className="text-2xl font-light uppercase tracking-widest" type="button">Contact</button>
-        </div>
-
-        {/* Bottom: Social + CTA */}
-        <div className="flex flex-col items-center space-y-6">
-          <div className="flex items-center space-x-6">
-            <a href="https://instagram.com" aria-label="Instagram" target="_blank" rel="noopener noreferrer"><Instagram size={22} /></a>
-            <a href="https://facebook.com" aria-label="Facebook" target="_blank" rel="noopener noreferrer"><Facebook size={22} /></a>
+      {/* Mobile Menu */}
+      {isOpen && (
+        <motion.div
+          id="mobile-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-hidden={!isOpen}
+          initial={{ opacity: 0, x: '100%' }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: '100%' }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="fixed inset-0 z-40 flex flex-col justify-between p-6 bg-white text-gray-900 md:hidden"
+        >
+          <div className="flex items-center justify-between">
+            <Link to="/" onClick={() => setIsOpen(false)}>
+              <img src={logo} alt="Logo" className="h-10 w-auto" />
+            </Link>
+            <button onClick={toggleMenu} aria-label="Close menu" type="button" className="p-2">
+              <X size={28} />
+            </button>
           </div>
 
-          <button onClick={() => handleNavClick('/book-a-call')} className="w-full max-w-xs px-6 py-3 border-2 border-gray-800 rounded-full text-sm font-semibold tracking-wider hover:bg-gray-800 hover:text-white transition" type="button">BOOK A CALL</button>
-        </div>
-      </div>
+          <div className="flex flex-col items-center mt-8 space-y-6">
+            <button onClick={() => handleNavClick('/')} className="text-2xl font-light uppercase tracking-widest" type="button">Home</button>
+            <button onClick={() => handleNavClick('/about')} className="text-2xl font-light uppercase tracking-widest" type="button">About</button>
+            <button onClick={() => scrollToSection('classes')} className="text-2xl font-light uppercase tracking-widest" type="button">Classes</button>
+            <button onClick={() => scrollToSection('instructors')} className="text-2xl font-light uppercase tracking-widest" type="button">Instructors</button>
+            <button onClick={() => scrollToSection('testimonials')} className="text-2xl font-light uppercase tracking-widest" type="button">Testimonials</button>
+            <button onClick={() => scrollToSection('contact')} className="text-2xl font-light uppercase tracking-widest" type="button">Contact</button>
+
+            {isAuthenticated && (
+              <>
+                <button onClick={() => handleNavClick('/profile')} className="text-2xl font-light uppercase tracking-widest" type="button">Profile</button>
+                <button onClick={handleLogout} className="text-2xl font-light uppercase tracking-widest" type="button">Logout</button>
+              </>
+            )}
+          </div>
+
+          <div className="flex flex-col items-center space-y-6">
+            <div className="flex items-center space-x-6">
+              <a href="https://instagram.com" aria-label="Instagram" target="_blank" rel="noopener noreferrer"><Instagram size={22} /></a>
+              <a href="https://facebook.com" aria-label="Facebook" target="_blank" rel="noopener noreferrer"><Facebook size={22} /></a>
+            </div>
+
+            <button onClick={() => handleNavClick('/book')} className="w-full max-w-xs px-6 py-3 border-2 border-gray-800 rounded-full text-sm font-semibold tracking-wider hover:bg-gray-800 hover:text-white transition" type="button">
+              BOOK A CALL
+            </button>
+          </div>
+        </motion.div>
+      )}
     </>
   );
 };

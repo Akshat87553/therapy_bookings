@@ -52,7 +52,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({ date }) => {
       const isoDate = format(date, 'yyyy-MM-dd');
       try {
         const { data } = await axios.get<BookingDoc[]>(
-          'http://localhost:5000/api/bookings/admin',
+          '/api/bookings/admin',
           {
             params: { date: isoDate },
             withCredentials: true,

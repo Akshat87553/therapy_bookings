@@ -48,7 +48,7 @@ process.env.TZ = "Asia/Kolkata"; // Set timezone for server-side date operations
 
 /* --- Middleware Setup --- */
 // Configure CORS to allow requests from your frontend development servers
-const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://192.168.1.4:5173/', 'http://localhost:5174'];
+const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://192.168.1.4:5173', 'http://localhost:5174'];
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {

@@ -102,16 +102,14 @@ const DesktopView: React.FC = () => {
   );
 };
 
-/* ---------------------------
-   MOBILE VIEW - TUNED (only mobile changes)
-   --------------------------- */
-/* ---------- MobileView (REPLACE THIS ONLY) ---------- */
-/* ---------- MobileView (SAFE REPLACEMENT) ---------- */
-/* ---------- MobileView (UPDATED) ---------- */
+/* ---------- MobileView (REPLACEMENT) ---------- */
 const MobileView: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [offsetY, setOffsetY] = useState<number>(0);
-  const marqueeSpeed = 12; // seconds, increase = slower, decrease = faster
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : true
+  );
+  const marqueeSpeed = 12; // seconds (increase = slower)
   const toggleQuestion = (i: number) => setOpenIndex(openIndex === i ? null : i);
 
   // safe scroll listener for parallax
@@ -123,7 +121,16 @@ const MobileView: React.FC = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // inject keyframes once
+  // update isMobile on resize so behaviour adapts if user rotates device
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', onResize, { passive: true });
+    onResize();
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // inject mobile marquee keyframes once
   useEffect(() => {
     const id = 'marquee-mobile-keyframes';
     if (document.getElementById(id)) return;
@@ -136,53 +143,126 @@ const MobileView: React.FC = () => {
       }
     `;
     document.head.appendChild(style);
-    // keep it — harmless to keep after unmount
   }, []);
 
   const bgPosition = `center ${-offsetY * 0.3}px`; // parallax factor matches desktop
 
   return (
     <section
+    
       id="faq"
       className="relative min-h-screen flex flex-col justify-between text-white"
-      style={{
-        WebkitOverflowScrolling: 'touch',
-        // ensure enough bottom spacing so CTA isn't clipped by curve
-        paddingBottom: `calc(5.5rem + env(safe-area-inset-bottom, 0px))`,
-        backgroundColor: 'transparent',
-        overflow: 'visible',
-      }}
-    >
-      {/* BACKGROUND LAYER: clipped ellipse + parallax */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 0,
-          backgroundImage: `url(${bgImage})`,
-          backgroundSize: 'cover',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: bgPosition,
-          // curve visible at the bottom (only on the background)
-          clipPath: 'ellipse(110% 88% at 50% -18%)',
-        }}
-      />
+     style={{
+  WebkitOverflowScrolling: 'touch',
+  // reduce top padding on mobile so content sits closer to the top
+  paddingTop: `1rem`,
+  // ensure enough bottom spacing so CTA isn't clipped by curve
+  paddingBottom: `calc(6.5rem + env(safe-area-inset-bottom, 0px))`,
+  backgroundColor: 'transparent',
+  overflow: 'visible',
+  // mobile-safe background directly on section (keeps image visible)
+  backgroundImage: isMobile ? `url(${bgImage})` : undefined,
+  backgroundSize: isMobile ? 'cover' : undefined,
+  backgroundRepeat: isMobile ? 'no-repeat' : undefined,
+  backgroundPosition: isMobile ? bgPosition : undefined,
+}}
 
-      {/* overlay for legibility (lighter so image shows through) */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 1,
-          background: 'rgba(0,0,0,0.18)',
-          pointerEvents: 'none',
-        }}
-      />
+    >
+      <img
+  src={bgImage}
+  alt=""
+  aria-hidden
+  style={{
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    zIndex: 0,
+    pointerEvents: 'none',
+    userSelect: 'none',
+    display: 'block',
+  }}
+/>
+      {/* BACKGROUND LAYER */}
+/* ---------- MOBILE: BACKGROUND + OVERLAY + CURVE (REPLACE THESE TWO DIVS) ---------- */
+
+/* 1) Background is applied to the section directly via style (guarantees mobile rendering) */
+/* 2) A simple absolute image layer is kept for parallax (but no clipPath / mask) */
+/* 3) Curve SVG is placed under content (zIndex: 2) so it cannot cover the CTA (content zIndex remains 10) */
+
+{/* NOTE: put this block at the same position where the old background + overlay divs were */}
+
+/* absolute image layer for parallax (kept but plain) */
+<div
+  aria-hidden
+  style={{
+    position: 'absolute',
+    inset: 0,
+    zIndex: 0, /* behind everything */
+    backgroundImage: `url(${bgImage})`,
+    backgroundSize: 'cover',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: `center ${-offsetY * 0.3}px`,
+    transform: 'translateZ(0)',
+    willChange: 'background-position',
+  }}
+/>
+
+/* subtle overlay so text is legible */
+<div
+  aria-hidden
+  style={{
+    position: 'absolute',
+    inset: 0,
+    zIndex: 1,
+    background: 'rgba(0,0,0,0.22)', /* slightly darker so text pops */
+    pointerEvents: 'none',
+  }}
+/>
+
+/* SVG curve that sits under the content but above the background.
+   zIndex:2 ensures content (zIndex:10) appears above it and CTA is not cut off. */
+<div
+  aria-hidden
+  style={{
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -2, /* nudge slightly so it visually meets the bottom */
+    height: 200,
+    zIndex: 2,
+    pointerEvents: 'none',
+    overflow: 'visible',
+  }}
+>
+  <svg
+    viewBox="0 0 100 40"
+    preserveAspectRatio="none"
+    style={{ width: '140%', height: '140%', display: 'block' }}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden
+  >
+    <path
+      d="M0 0 C25 40 75 40 100 0 L100 40 L0 40 Z"
+      fill="#ffffff"
+      opacity="0.98"
+    />
+  </svg>
+</div>
+
+
 
       {/* CONTENT (above bg & overlay) */}
-      <div style={{ position: 'relative', zIndex: 10 }} className="relative mx-auto px-5 pt-12 w-full max-w-xl">
+      <div
+  style={{
+    position: 'relative',
+    zIndex: 10,
+    // move content up only on mobile — tweak value if you want it higher/lower
+    marginTop:'-380px',
+  }}
+  className="relative mx-auto px-5 pt-6 w-full max-w-xl"
+>
         {/* Top marquee (no bottom ticker) */}
         <div className="relative overflow-hidden whitespace-nowrap py-3">
           <div style={{ width: '200%', display: 'inline-block' }}>

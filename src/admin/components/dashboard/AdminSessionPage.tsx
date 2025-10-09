@@ -57,7 +57,7 @@ const AdminCreateSessionPage: React.FC = () => {
       try {
         const { data } = await axios.get<
           Array<{ date: string; slots: Array<{ time: string; isAvailable: boolean; slotType: string }> }>
-        >('http://localhost:5000/api/schedule/availability', {
+        >('/api/schedule/availability', {
           params: { start: dateInput, end: dateInput },
           withCredentials: true,
         });
@@ -109,7 +109,7 @@ const AdminCreateSessionPage: React.FC = () => {
     try {
       // POST to new admin‐create endpoint
       await axios.post(
-        'http://localhost:5000/api/bookings/admin',
+        '/api/bookings/admin',
         payload,
         { withCredentials: true }
       );

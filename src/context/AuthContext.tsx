@@ -23,6 +23,16 @@ interface AuthContextType {
   updateProfile: (data: { name?: string; email?: string; phone?: string; password?: string }) => Promise<User>;
 }
 
+// Strict env-only: read VITE_API_BASE (no fallback)
+const API_BASE = (import.meta as any).env?.VITE_API_BASE as string | undefined;
+const API_AVAILABLE = Boolean(API_BASE);
+
+// If API_BASE is provided, set axios baseURL globally and enable cookies.
+if (API_AVAILABLE) {
+  axios.defaults.baseURL = API_BASE;
+}
+axios.defaults.withCredentials = true;
+
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -30,16 +40,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authLoading, setAuthLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
+  const makeApiUnavailableError = () =>
+    new Error('VITE_API_BASE is not set. Please add VITE_API_BASE=<your-api-url> to .env and restart the dev server.');
+
   const login = async (email: string, password: string, rememberMe: boolean) => {
+    if (!API_AVAILABLE) throw makeApiUnavailableError();
+
     try {
-      const { data } = await axios.post(
-        'http://localhost:5000/api/auth/login',
-        { email, password, rememberMe },
-        { withCredentials: true }
-      );
+      const { data } = await axios.post('/api/auth/login', { email, password, rememberMe });
       setIsAuthenticated(true);
       setUser(data.user);
-      return data.user;
+      return data.user as User;
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       throw new Error(axiosErr.response?.data?.message || 'Invalid email or password');
@@ -47,15 +58,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (name: string, email: string, password: string, phone?: string) => {
+    if (!API_AVAILABLE) throw makeApiUnavailableError();
+
     try {
-      const { data } = await axios.post(
-        'http://localhost:5000/api/auth/register',
-        { name, email, password, phone },
-        { withCredentials: true }
-      );
+      const { data } = await axios.post('/api/auth/register', { name, email, password, phone });
       setIsAuthenticated(true);
       setUser(data.user);
-      return data.user;
+      return data.user as User;
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       throw new Error(axiosErr.response?.data?.message || 'Failed to register. Please try again.');
@@ -63,8 +72,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    if (!API_AVAILABLE) {
+      // still clear local auth state even if API is missing
+      setIsAuthenticated(false);
+      setUser(null);
+      return;
+    }
+
     try {
-      await axios.post('http://localhost:5000/api/auth/logout', {}, { withCredentials: true });
+      await axios.post('/api/auth/logout', {});
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
@@ -74,12 +90,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const forgotPassword = async (email: string) => {
+    if (!API_AVAILABLE) throw makeApiUnavailableError();
+
     try {
-      await axios.post(
-        'http://localhost:5000/api/auth/forgot-password',
-        { email },
-        { withCredentials: true }
-      );
+      await axios.post('/api/auth/forgot-password', { email });
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       throw new Error(axiosErr.response?.data?.message || 'Failed to send reset link.');
@@ -87,12 +101,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (token: string, password: string) => {
+    if (!API_AVAILABLE) throw makeApiUnavailableError();
+
     try {
-      await axios.post(
-        `http://localhost:5000/api/auth/reset-password/${token}`,
-        { password },
-        { withCredentials: true }
-      );
+      await axios.post(`/api/auth/reset-password/${token}`, { password });
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       throw new Error(axiosErr.response?.data?.message || 'Failed to reset password.');
@@ -100,14 +112,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getProfile = async () => {
+    if (!API_AVAILABLE) {
+      // Make the state consistent: don't leave authLoading stuck
+      setIsAuthenticated(false);
+      setUser(null);
+      setAuthLoading(false);
+      return Promise.reject(makeApiUnavailableError());
+    }
+
     try {
-      const { data } = await axios.get('http://localhost:5000/api/auth/profile', {
-        withCredentials: true
-      });
+      const { data } = await axios.get('/api/auth/profile');
       setUser(data);
       setIsAuthenticated(true);
-      return data;
-    } catch {
+      return data as User;
+    } catch (err) {
       setIsAuthenticated(false);
       setUser(null);
       throw new Error('Failed to fetch profile.');
@@ -122,14 +140,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     phone?: string;
     password?: string;
   }) => {
+    if (!API_AVAILABLE) throw makeApiUnavailableError();
+
     try {
-      const { data } = await axios.put(
-        'http://localhost:5000/api/auth/profile',
-        fields,
-        { withCredentials: true }
-      );
+      const { data } = await axios.put('/api/auth/profile', fields);
       setUser(data.user);
-      return data.user;
+      return data.user as User;
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       throw new Error(axiosErr.response?.data?.message || 'Failed to update profile.');
@@ -137,7 +153,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    // Attempt to fetch profile on mount; getProfile handles the case when API_BASE is missing.
     getProfile().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

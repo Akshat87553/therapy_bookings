@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, getDay, addDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, getDay, addDays, isSameDay } from 'date-fns';
 
 interface MonthlyViewProps {
   currentDate: Date;
@@ -77,11 +77,15 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ currentDate, onDateChange, on
             {week.map((day, dayIndex) => (
               <div
                 key={dayIndex}
-                className={`h-24 border border-gray-200 rounded-lg p-2 cursor-pointer ${
-                  day && isSameMonth(day, currentDate)
-                    ? 'bg-white'
-                    : 'bg-gray-50'
-                }`}
+         // uses Tailwind arbitrary values — works with Tailwind v3+ (JIT)
+className={`h-24 rounded-lg p-2 cursor-pointer border transition-shadow duration-150 ease-in-out ${
+  day && isSameDay(day, new Date())
+    ? 'border-2 border-[#9CA86A] bg-white shadow-[0_6px_18px_rgba(156,168,106,0.12)]'
+    : 'border-gray-200'
+} ${day && !isSameMonth(day, currentDate) ? 'bg-gray-50' : 'bg-white'}`}
+
+
+
                 onClick={() => day && onDateSelect(day)}
               >
                 {day && (

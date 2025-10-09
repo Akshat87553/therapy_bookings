@@ -1,10 +1,11 @@
+// src/pages/Profile.tsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 
 const Profile: React.FC = () => {
-  const { user, getProfile, updateProfile, logout } = useAuth();
+  const { user, getProfile, updateProfile, logout, authLoading } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -14,22 +15,30 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) {
-      getProfile().then((data) => {
-        setName(data.name);
-        setEmail(data.email);
-        setPhone(data.phone || '');
-      }).catch((err) => {
-        const axiosError = err as AxiosError<{ message?: string }>;
-        console.error('Get profile error:', axiosError.response?.data?.message || axiosError.message);
-        navigate('/login');
-      });
-    } else {
-      setName(user.name);
-      setEmail(user.email);
-      setPhone(user.phone || '');
+    let mounted = true;
+    const fillFromUser = (u: any) => {
+      if (!mounted) return;
+      setName(u?.name ?? '');
+      setEmail(u?.email ?? '');
+      setPhone(u?.phone ?? '');
+    };
+
+    if (user) {
+      fillFromUser(user);
+    } else if (!authLoading) {
+      getProfile()
+        .then((data) => fillFromUser(data))
+        .catch((err) => {
+          const axiosErr = err as AxiosError<{ message?: string }>;
+          console.error('Get profile error:', axiosErr.response?.data?.message ?? axiosErr.message);
+          navigate('/login');
+        });
     }
-  }, [user, getProfile, navigate]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [user, authLoading, getProfile, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,75 +49,134 @@ const Profile: React.FC = () => {
       setMessage('Profile updated successfully');
       setPassword('');
     } catch (err) {
-      const axiosError = err as AxiosError<{ message?: string }>;
-      setError(axiosError.response?.data?.message || axiosError.message || 'Failed to update profile');
+      const axiosErr = err as AxiosError<{ message?: string }>;
+      setError(axiosErr.response?.data?.message ?? axiosErr.message ?? 'Failed to update profile');
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
   return (
-    <div className="max-w-md mx-auto mt-8">
-      <h2 className="text-2xl font-bold mb-4">My Profile</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="name" className="block">Name</label>
-          <input
-            type="text"
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full p-2 border rounded"
-            required
-          />
+    <div className="min-h-[70vh] flex items-start justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-xl">
+        {/* Card */}
+        <div className="bg-white shadow-lg rounded-2xl overflow-hidden border border-gray-100">
+          <div className="px-6 py-8 sm:px-10">
+            {/* Header */}
+            <div className="flex items-center space-x-4 mb-6">
+              {/* Avatar placeholder */}
+              <div className="flex-shrink-0">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-400 flex items-center justify-center text-white text-xl font-semibold">
+                  {name ? name.split(' ').map(n => n[0]).slice(0,2).join('') : 'U'}
+                </div>
+              </div>
+              <div>
+                <h1 className="text-2xl font-serif text-gray-900">My Profile</h1>
+                <p className="text-sm text-gray-500">Manage your account information</p>
+              </div>
+            </div>
+
+            {/* Success / Error messages */}
+            <div className="space-y-2 mb-4">
+              {message && (
+                <div className="rounded-md bg-green-50 border border-green-100 p-3 text-green-800 text-sm">
+                  {message}
+                </div>
+              )}
+              {error && (
+                <div className="rounded-md bg-red-50 border border-red-100 p-3 text-red-800 text-sm">
+                  {error}
+                </div>
+              )}
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-4 py-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-4 py-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="text"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-4 py-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">New Password (optional)</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Leave blank to keep current password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-4 py-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="submit"
+                  className="w-full inline-flex justify-center items-center rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 shadow-sm transition"
+                >
+                  Update Profile
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full inline-flex justify-center items-center rounded-lg border border-gray-200 bg-white text-gray-700 font-medium px-4 py-2 hover:bg-gray-50 transition"
+                >
+                  Logout
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Footer area of card */}
+          <div className="bg-gray-50 px-6 py-4 text-xs text-gray-500">
+            <div className="flex items-center justify-between">
+              <span>Account ID: <span className="font-mono text-gray-700">{user?.id ?? '—'}</span></span>
+              <span className="italic">Last sync: {new Date().toLocaleString()}</span>
+            </div>
+          </div>
         </div>
-        <div>
-          <label htmlFor="email" className="block">Email</label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="phone" className="block">Phone</label>
-          <input
-            type="text"
-            id="phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label htmlFor="password" className="block">New Password (optional)</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-2 border rounded"
-            placeholder="Leave blank to keep current password"
-          />
-        </div>
-        {message && <p className="text-green-600">{message}</p>}
-        {error && <p className="text-red-600">{error}</p>}
-        <button type="submit" className="w-full p-2 bg-blue-600 text-white rounded">
-          Update Profile
-        </button>
-      </form>
-      <button
-        onClick={handleLogout}
-        className="w-full p-2 mt-4 bg-red-600 text-white rounded"
-      >
-        Logout
-      </button>
+
+        {/* bottom spacing so footer never overlaps */}
+        <div className="h-12" />
+      </div>
     </div>
   );
 };

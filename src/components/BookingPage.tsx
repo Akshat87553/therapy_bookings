@@ -34,6 +34,9 @@ interface SlotData {
 axios.defaults.withCredentials = true;
 const adminId = '682fa52d899e328f422b6851';
 
+// Strict env-only base URL
+const API_BASE = (import.meta as any).env?.VITE_API_BASE as string | undefined;
+
 const BookingPage: React.FC = () => {
   // ─── Session / UI state ──────────────────────────────────────────
   const [selectedMode, setSelectedMode] = useState<SessionMode>('in-person');
@@ -91,12 +94,17 @@ const BookingPage: React.FC = () => {
       setFeesLoading(true);
       setFeesError(null);
 
+      if (!API_BASE) {
+        setFeesError('VITE_API_BASE is not set. Please add it to .env and restart the dev server.');
+        setFeesLoading(false);
+        return;
+      }
+
       const regionParam = userCountry === 'IN' ? 'india' : 'intl';
-      const url = `http://localhost:5000/api/public/fees/${adminId}?region=${regionParam}`;
+      const url = `${API_BASE}/api/public/fees/${adminId}?region=${regionParam}`;
 
       try {
         const { data } = await axios.get(url);
-
         setOnlinePrice50(data.online.price50);
         setInPersonPrice50(data.inPerson.price50);
       } catch (err: any) {
@@ -112,16 +120,22 @@ const BookingPage: React.FC = () => {
 
   // ---------- Fetch available slots ----------
   const fetchAvailableSlots = async () => {
+    if (!API_BASE) {
+      console.error('VITE_API_BASE is not set — cannot fetch available slots.');
+      setAvailableSlotsByDate({});
+      return;
+    }
+
     const start = format(new Date(), 'yyyy-MM-dd');
     const end = format(addDays(new Date(), 6), 'yyyy-MM-dd');
 
     try {
       const { data } = await axios.get<SlotData[]>(
-        'http://localhost:5000/api/schedule/available-slots',
+        `${API_BASE}/api/schedule/available-slots`,
         { params: { start, end, adminId }, withCredentials: true }
       );
 
-      const slotsByDate = data.reduce((acc: Record<string, string[]>, item) => {
+      const slotsByDate = (data || []).reduce((acc: Record<string, string[]>, item) => {
         let isoDate: string;
         if (typeof item.date === 'string') {
           isoDate = item.date.slice(0, 10);
@@ -258,8 +272,13 @@ const BookingPage: React.FC = () => {
 
   const sessionPrice = selectedMode === 'online' ? onlinePrice50 : inPersonPrice50;
 
-  // ─── handle payment flow (unchanged)
+  // ─── handle payment flow (uses API_BASE)
   const handlePayment = async () => {
+    if (!API_BASE) {
+      alert('Server base URL not configured. Please set VITE_API_BASE in your .env and restart dev server.');
+      return;
+    }
+
     try {
       const bookingData = {
         adminId,
@@ -277,11 +296,11 @@ const BookingPage: React.FC = () => {
         status: 'pending',
       };
 
-      const bookingResp = await axios.post('http://localhost:5000/api/bookings', bookingData, { withCredentials: true });
+      const bookingResp = await axios.post(`${API_BASE}/api/bookings`, bookingData, { withCredentials: true });
       const bookingId: string = bookingResp.data.bookingId;
       if (!bookingId) throw new Error('Booking creation failed: no bookingId returned');
 
-      const { data } = await axios.post('http://localhost:5000/api/payments/create-order', { bookingId, amount: sessionPrice }, { withCredentials: true });
+      const { data } = await axios.post(`${API_BASE}/api/payments/create-order`, { bookingId, amount: sessionPrice }, { withCredentials: true });
       const orderId: string = data.orderId;
       if (!orderId) throw new Error('Create-order failed: no orderId returned');
 
@@ -294,7 +313,7 @@ const BookingPage: React.FC = () => {
         order_id:  orderId,
         handler: async (resp: any) => {
           try {
-            const verifyResp = await axios.post('http://localhost:5000/api/payments/verify', {
+            const verifyResp = await axios.post(`${API_BASE}/api/payments/verify`, {
               razorpay_payment_id: resp.razorpay_payment_id,
               razorpay_order_id:  resp.razorpay_order_id,
               razorpay_signature: resp.razorpay_signature,
@@ -439,7 +458,7 @@ const BookingPage: React.FC = () => {
           <div className="flex items-center mb-8 pb-8 border-b border-gray-200">
             <img src="https://images.pexels.com/photos/5384534/pexels-photo-5384534.jpeg?auto=compress&cs=tinysrgb&w=1600" alt={selectedInstructor.name} className="w-12 h-12 rounded-full object-cover" />
             <div className="ml-4">
-              <h2 className="text-lg font-medium">Pilates session with</h2>
+              <h2 className="text-lg font-medium">Therapy session with</h2>
               <p className="text-gray-600">{selectedInstructor.name}</p>
             </div>
           </div>

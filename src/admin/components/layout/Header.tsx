@@ -1,25 +1,24 @@
-// src/admin/components/layout/Header.tsx
 import React, { useEffect, useState } from 'react';
 import { Bell, Menu, ChevronDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const Header = () => {
-  const [menuOpen, setMenuOpen] = React.useState(false);
+type HeaderProps = {
+  onToggleSidebar?: () => void;
+};
+
+const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const navigate = useNavigate();
 
-  // Fetch unread notifications count
   useEffect(() => {
     const fetchUnread = async () => {
       try {
         const res = await axios.get<{ _id: string; read: boolean }[]>('/api/notifications', {
           withCredentials: true,
         });
-        // Count how many have read === false
-        const count = Array.isArray(res.data)
-          ? res.data.filter((n) => !n.read).length
-          : 0;
+        const count = Array.isArray(res.data) ? res.data.filter((n) => !n.read).length : 0;
         setUnreadCount(count);
       } catch (err) {
         console.error('Error fetching notifications:', err);
@@ -27,31 +26,31 @@ const Header = () => {
       }
     };
     fetchUnread();
-    // Optionally, you could re-run this every minute or when you know notifications change.
   }, []);
 
-  // Handle log out: calls backend to clear the HTTP-only JWT cookie, then redirect to /login
   const handleLogout = async () => {
-    try {
-      await axios.post(
-        'http://localhost:5000/api/auth/logout',
-        {},
-        {
-          withCredentials: true,
-        }
-      );
-    } catch (err) {
-      console.warn('Logout request failed:', err);
-    } finally {
-      // Unconditionally navigate to login
+ try {
+      // use relative path (no hardcoded host)
+      await axios.post('/api/auth/logout', {}, { withCredentials: true });
+
+      // optionally navigate to login page or refresh auth state
       navigate('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+      // show user-friendly message if you want
     }
   };
 
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
       <div className="flex md:hidden">
-        <button className="text-gray-600">
+        <button
+          className="text-gray-600"
+          onClick={() => {
+            if (onToggleSidebar) onToggleSidebar();
+          }}
+          aria-label="Open sidebar"
+        >
           <Menu className="w-6 h-6" />
         </button>
       </div>
@@ -61,7 +60,6 @@ const Header = () => {
       </div>
 
       <div className="flex items-center space-x-4">
-        {/* Bell → Link to /admin/notifications */}
         <Link to="/admin/notifications" className="relative text-gray-600">
           <Bell className="w-6 h-6" />
           {unreadCount > 0 && (
@@ -71,15 +69,9 @@ const Header = () => {
           )}
         </Link>
 
-        {/* Profile dropdown */}
         <div className="relative">
-          <button
-            className="flex items-center space-x-2"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            <div className="w-8 h-8 rounded-full bg-olive-700 flex items-center justify-center text-white font-medium">
-              N
-            </div>
+          <button className="flex items-center space-x-2" onClick={() => setMenuOpen(!menuOpen)}>
+            <div className="w-8 h-8 rounded-full bg-olive-700 flex items-center justify-center text-white font-medium">N</div>
             <ChevronDown className="w-4 h-4 text-gray-600" />
           </button>
 

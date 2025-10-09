@@ -1,27 +1,13 @@
+// server/routes/auth.js
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
 import User from '../models/User.js';
-import Notification from '../models/notification.js'; 
-
+import Notification from '../models/notification.js';
 
 const router = express.Router();
-const app = express();
 
-app.use(
-  cors({
-    origin: 'http://localhost:5173',
-    credentials: true
-  })
-);
-app.use(express.json());
-app.use(cookieParser());
-
-// Login Route (for both users and admins)
+// Login Route
 router.post('/login', async (req, res) => {
   try {
     const { email, password, rememberMe } = req.body;
@@ -46,18 +32,18 @@ router.post('/login', async (req, res) => {
     // Set token as HTTP-only cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000, // 30 days or 24 hours
+      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
     });
 
-    // Return user data
-    res.json({
+    return res.json({
       user: {
         id: user._id,
         email: user.email,
         name: user.name,
         role: user.role,
+        phone: user.phone,
       },
     });
   } catch (error) {
@@ -69,9 +55,7 @@ router.post('/login', async (req, res) => {
 // Register Route
 router.post('/register', async (req, res) => {
   try {
-    // FIX: Removed `role` from destructuring to prevent privilege escalation.
     const { name, email, password, phone } = req.body;
-    console.log('Register request body:', req.body);
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -81,15 +65,14 @@ router.post('/register', async (req, res) => {
     const user = new User({
       name,
       email,
-      password, // Handled by pre-save hook
+      password,
       phone,
-      role: 'user', // FIX: Role is hardcoded to 'user' for security.
+      role: 'user',
     });
-     console.log('🐛  New User doc before save:', user);
-     await user.save();
-      console.log('🐛  Saved User:', user);
 
-    // Notify admins about the new user registration
+    await user.save();
+
+    // Notify admins
     const admins = await User.find({ role: 'admin' }).select('_id');
     if (admins.length > 0) {
       const notifications = admins.map(a => ({
@@ -100,19 +83,18 @@ router.post('/register', async (req, res) => {
       }));
       await Notification.insertMany(notifications);
     }
-    
-     const token = jwt.sign(
+
+    const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
-     );
+    );
 
-      // Set token as HTTP-only cookie
-     res.cookie('token', token, {
+    res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     res.status(201).json({
@@ -121,49 +103,31 @@ router.post('/register', async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        phone: user.phone,
       },
     });
-    
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ message: error.message || 'Server error during registration' });
   }
 });
 
-// Forgot Password Route
+// Forgot Password
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
     if (!user) {
-      // Return a generic message to prevent user enumeration
       return res.json({ message: 'If a user with that email exists, a password reset link has been sent.' });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    user.resetPasswordExpires = Date.now() + 3600000;
     await user.save();
 
-    // Send reset email (configure your email service)
     const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
     console.log(`Reset URL for ${email}: ${resetUrl}`);
-    // Example with Nodemailer (uncomment and configure):
-    /*
-    const transporter = nodemailer.createTransport({
-      service: 'Gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-    await transporter.sendMail({
-      to: email,
-      subject: 'Password Reset Request',
-      html: `<p>Click <a href="${resetUrl}">here</a> to reset your password.</p>`,
-    });
-    */
 
     res.json({ message: 'Password reset link sent' });
   } catch (error) {
@@ -172,7 +136,7 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// Reset Password Route
+// Reset Password
 router.post('/reset-password/:token', async (req, res) => {
   try {
     const { token } = req.params;
@@ -187,7 +151,7 @@ router.post('/reset-password/:token', async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired reset token' });
     }
 
-    user.password = password; // Will be hashed by pre-save hook
+    user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
@@ -199,15 +163,21 @@ router.post('/reset-password/:token', async (req, res) => {
   }
 });
 
-// Get User Profile Route
+// Get Profile
 router.get('/profile', async (req, res) => {
   try {
-    const token = req.cookies.token; // Retrieve token from HTTP-only cookie
+    const token = req.cookies?.token;
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
     const user = await User.findById(decoded.userId).select('-password -resetPasswordToken -resetPasswordExpires');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -222,19 +192,25 @@ router.get('/profile', async (req, res) => {
     });
   } catch (error) {
     console.error('Profile error:', error);
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Update User Profile Route
+// Update Profile
 router.put('/profile', async (req, res) => {
   try {
-    const token = req.cookies.token;
+    const token = req.cookies?.token;
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
     const { name, email, phone, password } = req.body;
 
     const user = await User.findById(decoded.userId);
@@ -245,7 +221,7 @@ router.put('/profile', async (req, res) => {
     if (name) user.name = name;
     if (email) user.email = email;
     if (phone) user.phone = phone;
-    if (password) user.password = password; // Will be hashed by pre-save hook
+    if (password) user.password = password;
 
     await user.save();
 
@@ -265,9 +241,8 @@ router.put('/profile', async (req, res) => {
   }
 });
 
-// Logout Route
+// Logout
 router.post('/logout', (req, res) => {
-  // Clear the HTTP-only cookie
   res.clearCookie('token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

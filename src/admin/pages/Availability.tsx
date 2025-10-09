@@ -6,7 +6,7 @@ import MonthlyView from '../components/availability/MonthlyView';
 type ViewMode = 'week' | 'month';
 
 // Adjusted to match your routes
-const API_URL = 'http://localhost:5000/api';
+const API_URL = '/api';
 
 const Availability: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('week');

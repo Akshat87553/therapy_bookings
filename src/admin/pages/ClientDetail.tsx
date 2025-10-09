@@ -30,7 +30,7 @@ const ClientSessions: React.FC = () => {
     const fetchSessions = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/bookings/client/${encodeURIComponent(email)}`,
+          `/api/bookings/client/${encodeURIComponent(email)}`,
           { credentials: 'include' }
         );
 

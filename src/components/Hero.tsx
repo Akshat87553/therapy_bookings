@@ -1,11 +1,12 @@
-// Hero.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 import bgImage from './templetes/Untitled design.png';
 
 const Hero: React.FC = () => {
   const [offsetY, setOffsetY] = useState(0);
+  const { isAuthenticated, logout } = useAuth();
 
   // Parallax scroll
   useEffect(() => {
@@ -54,9 +55,9 @@ const Hero: React.FC = () => {
           Work with me
         </motion.p>
 
-        {/* Mobile font reduced; desktop unchanged */}
+        {/* Mobile: larger overlapping title; desktop unchanged */}
         <motion.h1
-          className="text-5xl sm:text-6xl md:text-8xl font-light italic font-serif"
+          className="text-[5.5rem] sm:text-[6.5rem] md:text-8xl font-light italic font-serif leading-none -mt-2"
           initial="hidden"
           animate="visible"
           variants={scaleIn}
@@ -65,8 +66,9 @@ const Hero: React.FC = () => {
           individual
         </motion.h1>
 
+        {/* Smaller circular image on mobile; original size on desktop */}
         <motion.div
-          className="relative w-96 h-[27rem] md:w-[24rem] md:h-[32rem] rounded-full overflow-hidden shadow-xl"
+          className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-[24rem] md:h-[32rem] rounded-full overflow-hidden shadow-xl mx-auto"
           initial="hidden"
           animate="visible"
           variants={scaleIn}
@@ -76,14 +78,14 @@ const Hero: React.FC = () => {
             src="https://images.squarespace-cdn.com/content/v1/6410c406068e884b306dfd98/d7d1c09b-f59a-4f34-88e1-a654d77a681c/pexels-spring-toan-4075508.jpg?format=1500w"
             alt="Therapist smiling"
             className="w-full h-full object-cover"
-            loading="eager" // Explicitly tell the browser to load this image eagerly
+            loading="eager"
           />
         </motion.div>
 
-        {/* Mobile: in flow; Desktop: original absolute positions restored */}
+        {/* Overlapping text (consultation) */}
         <motion.h2
           className="
-            mt-4 text-4xl sm:text-5xl font-serif leading-tight
+            -mt-6 text-[4.2rem] sm:text-[5.2rem] font-serif leading-[0.95]
             md:absolute md:top-[18%] md:left-[-10%] md:transform md:-translate-x-1/2 md:text-8xl md:leading-none
           "
           initial="hidden"
@@ -94,9 +96,10 @@ const Hero: React.FC = () => {
           consultation
         </motion.h2>
 
+        {/* Supporting text */}
         <motion.h3
           className="
-            mt-3 text-3xl sm:text-4xl italic font-serif
+            -mt-1 text-[3.2rem] sm:text-[4rem] italic font-serif leading-tight
             md:absolute md:bottom-[3%] md:left-[7%] md:transform md:-translate-x-1/2 md:text-7xl
           "
           initial="hidden"
@@ -107,7 +110,7 @@ const Hero: React.FC = () => {
           for therapists
         </motion.h3>
 
-        {/* CTA: in flow on mobile; absolute on desktop with original coordinates */}
+        {/* CTA button */}
         <motion.div
           className="
             mt-6 md:mt-0
@@ -119,12 +122,12 @@ const Hero: React.FC = () => {
           variants={fadeUp}
           custom={1.8}
         >
-          <Link
-            to="/register"
-            className="border border-white px-10 py-5 rounded-full font-semibold hover:bg-white hover:text-blue-900 transition"
-          >
-            Book a session
-          </Link>
+     <Link
+  to={isAuthenticated ? '/book' : '/register'}
+  className="border border-white px-8 py-3 rounded-full font-semibold text-sm hover:bg-white hover:text-blue-900 transition"
+>
+  Book a session
+</Link>
         </motion.div>
       </div>
     </section>

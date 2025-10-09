@@ -43,7 +43,7 @@ const ClientBookingNote: React.FC<ClientBookingNoteProps> = ({ booking }) => {
   const saveNote = async () => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/bookings/${booking.id}/note`,
+        `/api/bookings/${booking.id}/note`,
         {
           method: 'PUT',
           credentials: 'include',

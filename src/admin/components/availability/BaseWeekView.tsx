@@ -14,7 +14,7 @@ interface BaseWeekViewProps {
   onSlotSelect: (date: string, day: string, time: string, type: string, isAvailable: boolean) => void;
 }
 
-const API_URL = 'http://localhost:5000/api/schedule';
+const API_URL = '/api/schedule';
 
 const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) => {
   const [selectedTimeRange, setSelectedTimeRange] = useState<'Night' | 'Day'>('Day');

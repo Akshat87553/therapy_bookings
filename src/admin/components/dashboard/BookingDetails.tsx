@@ -74,7 +74,7 @@ const EditSessionPage: React.FC = () => {
           setLoading(false);
           return;
         }
-        const { data } = await axios.get<BookingDoc>(`http://localhost:5000/api/bookings/admin/${id}`, {
+        const { data } = await axios.get<BookingDoc>(`/api/bookings/admin/${id}`, {
           withCredentials: true,
         });
         setBooking(data);
@@ -123,7 +123,7 @@ const EditSessionPage: React.FC = () => {
       try {
         const { data } = await axios.get<
           Array<{ date: string; slots: Array<{ time: string; isAvailable: boolean; slotType: string }> }>
-        >('http://localhost:5000/api/schedule/availability', {
+        >('/api/schedule/availability', {
           params: { start: dateInput, end: dateInput },
           withCredentials: true,
         });
@@ -193,7 +193,7 @@ const EditSessionPage: React.FC = () => {
 
     try {
       await axios.patch(
-        `http://localhost:5000/api/bookings/admin/${booking._id}`,
+        `/api/bookings/admin/${booking._id}`,
         payload,
         { withCredentials: true }
       );

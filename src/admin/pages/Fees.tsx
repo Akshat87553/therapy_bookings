@@ -41,7 +41,7 @@ const Fees: React.FC = () => {
   useEffect(() => {
     const fetchFees = async () => {
       try {
-        const { data } = await axios.get<FeesResponse>('http://localhost:5000/api/fees', {
+        const { data } = await axios.get<FeesResponse>('/api/fees', {
           withCredentials: true,
         });
 
@@ -84,7 +84,7 @@ const Fees: React.FC = () => {
     setError(null);
     try {
       await axios.post(
-        'http://localhost:5000/api/fees',
+        '/api/fees',
         { online, inPerson, offerCouplesTherapy },
         { withCredentials: true }
       );
