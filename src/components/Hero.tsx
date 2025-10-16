@@ -6,7 +6,7 @@ import bgImage from './templetes/Untitled design.png';
 
 const Hero: React.FC = () => {
   const [offsetY, setOffsetY] = useState(0);
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   // Parallax scroll
   useEffect(() => {

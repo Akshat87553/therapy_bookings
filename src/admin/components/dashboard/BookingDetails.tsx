@@ -78,9 +78,15 @@ const EditSessionPage: React.FC = () => {
           withCredentials: true,
         });
         setBooking(data);
-      } catch (err: any) {
-        console.error('Error fetching booking:', err);
-        setError(err.response?.data?.message || 'Could not load booking');
+      } catch (error) {
+        console.error('Error fetching booking:', error);
+        if (axios.isAxiosError<{ message?: string }>(error)) {
+          setError(error.response?.data?.message || 'Could not load booking');
+        } else if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError('Could not load booking');
+        }
       }
       setLoading(false);
     }
@@ -146,9 +152,15 @@ const EditSessionPage: React.FC = () => {
           }
           setAvailableSlots(merged);
         }
-      } catch (err: any) {
-        console.error('Error fetching availability:', err);
-        setSlotsError(err.response?.data?.message || 'Could not load availability');
+      } catch (error) {
+        console.error('Error fetching availability:', error);
+        if (axios.isAxiosError<{ message?: string }>(error)) {
+          setSlotsError(error.response?.data?.message || 'Could not load availability');
+        } else if (error instanceof Error) {
+          setSlotsError(error.message);
+        } else {
+          setSlotsError('Could not load availability');
+        }
         setAvailableSlots([]);
       }
 
@@ -198,9 +210,15 @@ const EditSessionPage: React.FC = () => {
         { withCredentials: true }
       );
       navigate(-1);
-    } catch (err: any) {
-      console.error('Error updating booking:', err);
-      alert(err.response?.data?.message || 'Failed to save changes');
+    } catch (error) {
+      console.error('Error updating booking:', error);
+      if (axios.isAxiosError<{ message?: string }>(error)) {
+        alert(error.response?.data?.message || 'Failed to save changes');
+      } else if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Failed to save changes');
+      }
       setSaving(false);
     }
   };

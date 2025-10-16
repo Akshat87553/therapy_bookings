@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { format, parseISO, isValid } from 'date-fns';
+import { parseISO, isValid } from 'date-fns';
 
 interface CreatePayload {
   firstName: string;
@@ -73,9 +73,15 @@ const AdminCreateSessionPage: React.FC = () => {
               .map((slot) => slot.time)
           );
         }
-      } catch (err: any) {
-        console.error('Error fetching availability:', err);
-        setSlotsError(err.response?.data?.message || 'Could not load slots');
+      } catch (error) {
+        console.error('Error fetching availability:', error);
+        if (axios.isAxiosError<{ message?: string }>(error)) {
+          setSlotsError(error.response?.data?.message || 'Could not load slots');
+        } else if (error instanceof Error) {
+          setSlotsError(error.message);
+        } else {
+          setSlotsError('Could not load slots');
+        }
         setAvailableSlots([]);
       }
       setSlotsLoading(false);
@@ -115,9 +121,15 @@ const AdminCreateSessionPage: React.FC = () => {
       );
       // On success, go back to dashboard (or to the same date view)
       navigate(`/admin/dashboard?date=${dateInput}`);
-    } catch (err: any) {
-      console.error('Error creating session:', err);
-      alert(err.response?.data?.message || 'Failed to create session');
+    } catch (error) {
+      console.error('Error creating session:', error);
+      if (axios.isAxiosError<{ message?: string }>(error)) {
+        alert(error.response?.data?.message || 'Failed to create session');
+      } else if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Failed to create session');
+      }
     }
   };
 

@@ -164,7 +164,7 @@ const MobileView: React.FC = () => {
   );
 };
 
-const classes: React.FC = () => {
+const Classes: React.FC = () => {
   const [offsetY, setOffsetY] = useState(0);
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
@@ -189,4 +189,4 @@ const classes: React.FC = () => {
   return isDesktop ? <DesktopView offsetY={offsetY} /> : <MobileView />;
 };
 
-export default classes;
+export default Classes;

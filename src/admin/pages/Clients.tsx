@@ -33,9 +33,13 @@ const Clients: React.FC = () => {
         }
         const data: User[] = await res.json();
         setUsers(data);
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || 'Failed to load clients');
+      } catch (error) {
+        console.error(error);
+        if (error instanceof Error) {
+          setError(error.message || 'Failed to load clients');
+        } else {
+          setError('Failed to load clients');
+        }
       } finally {
         setLoading(false);
       }

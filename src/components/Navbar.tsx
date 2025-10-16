@@ -76,7 +76,7 @@ const Navbar: React.FC = () => {
       <nav
         role="navigation"
         aria-label="Main"
-        className={`fixed inset-x-0 top-0 z-50 transition-all`}
+        className={`fixed inset-x-0 top-0 z-50 transition-all ${scrolled ? 'bg-black/60 backdrop-blur-lg shadow-lg' : 'bg-transparent'}`}
       >
         <div className="relative flex items-center justify-between w-full px-6 md:px-8 py-4">
           {/* Left: Logo */}

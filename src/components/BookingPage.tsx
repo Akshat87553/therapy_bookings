@@ -35,7 +35,7 @@ axios.defaults.withCredentials = true;
 const adminId = '682fa52d899e328f422b6851';
 
 // Strict env-only base URL
-const API_BASE = (import.meta as any).env?.VITE_API_BASE as string | undefined;
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 const BookingPage: React.FC = () => {
   // ─── Session / UI state ──────────────────────────────────────────
@@ -52,7 +52,6 @@ const BookingPage: React.FC = () => {
     phone:     '',
   });
   const [consentChecked, setConsentChecked] = useState<boolean>(false);
-  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
 
   // ─── Remember which slots this user has just booked (so we can hide them + the next slot) ────────────────────
   const [occupiedSlots, setOccupiedSlots] = useState<OccupiedSlot[]>([]);
@@ -107,9 +106,15 @@ const BookingPage: React.FC = () => {
         const { data } = await axios.get(url);
         setOnlinePrice50(data.online.price50);
         setInPersonPrice50(data.inPerson.price50);
-      } catch (err: any) {
-        console.error('Error fetching fees:', err);
-        setFeesError(err.response?.data?.message || 'Failed to load fees');
+      } catch (error) {
+        console.error('Error fetching fees:', error);
+        if (axios.isAxiosError<{ message?: string }>(error)) {
+          setFeesError(error.response?.data?.message || 'Failed to load fees');
+        } else if (error instanceof Error) {
+          setFeesError(error.message);
+        } else {
+          setFeesError('Failed to load fees');
+        }
       } finally {
         setFeesLoading(false);
       }
@@ -142,20 +147,19 @@ const BookingPage: React.FC = () => {
         } else {
           isoDate = format(new Date(item.date), 'yyyy-MM-dd');
         }
-        const times = (item.slots || []).filter(s => s.isAvailable).map(s => s.time);
+        const times = (item.slots || []).filter((slot) => slot.isAvailable).map((slot) => slot.time);
         acc[isoDate] = times;
         return acc;
       }, {});
       setAvailableSlotsByDate(slotsByDate);
-    } catch (err) {
-      console.error('Error fetching available slots:', err);
+    } catch (error) {
+      console.error('Error fetching available slots:', error);
       setAvailableSlotsByDate({});
     }
   };
 
   useEffect(() => {
     fetchAvailableSlots();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ─── Razorpay script loader ─────────────────────────────────────────────────────
@@ -184,11 +188,6 @@ const BookingPage: React.FC = () => {
     } catch {
       return Number.POSITIVE_INFINITY;
     }
-  };
-
-  const isWithinMinutes = (dateStr: string, time: string, minutes: number) => {
-    const mins = minutesUntil(dateStr, time);
-    return mins <= minutes && mins >= 0;
   };
 
   // ─── Occupied filter
@@ -300,7 +299,11 @@ const BookingPage: React.FC = () => {
       const bookingId: string = bookingResp.data.bookingId;
       if (!bookingId) throw new Error('Booking creation failed: no bookingId returned');
 
-      const { data } = await axios.post(`${API_BASE}/api/payments/create-order`, { bookingId, amount: sessionPrice }, { withCredentials: true });
+      const { data } = await axios.post(
+        `${API_BASE}/api/payments/create-order`,
+        { bookingId, amount: sessionPrice },
+        { withCredentials: true }
+      );
       const orderId: string = data.orderId;
       if (!orderId) throw new Error('Create-order failed: no orderId returned');
 
@@ -311,7 +314,7 @@ const BookingPage: React.FC = () => {
         name:      'Pilates Booking',
         description: 'Session booking',
         order_id:  orderId,
-        handler: async (resp: any) => {
+        handler: async (resp: RazorpayResponse) => {
           try {
             const verifyResp = await axios.post(`${API_BASE}/api/payments/verify`, {
               razorpay_payment_id: resp.razorpay_payment_id,
@@ -321,15 +324,14 @@ const BookingPage: React.FC = () => {
             }, { withCredentials: true });
 
             if (verifyResp.data.success) {
-              setPaymentSuccess(true);
               setCurrentStep('confirmation');
               setOccupiedSlots((prev) => [...prev, { date: selectedDate, time: selectedTime }]);
               fetchAvailableSlots();
             } else {
               alert('Payment verification failed: ' + verifyResp.data.message);
             }
-          } catch (err) {
-            console.error('Error verifying payment:', err);
+          } catch (error) {
+            console.error('Error verifying payment:', error);
             alert('Payment verification failed. Please try again.');
           }
         },
@@ -337,10 +339,20 @@ const BookingPage: React.FC = () => {
         theme: { color: '#4F46E5' },
       };
 
-      new (window as any).Razorpay(options).open();
-    } catch (err: any) {
-      console.error('Error in handlePayment:', err);
-      alert('Failed to create booking or order: ' + (err.message || 'Unknown error'));
+      const RazorpayConstructor = window.Razorpay;
+      if (!RazorpayConstructor) {
+        alert('Payment gateway is unavailable. Please refresh the page and try again.');
+        return;
+      }
+
+      new RazorpayConstructor(options).open();
+    } catch (error) {
+      console.error('Error in handlePayment:', error);
+      if (error instanceof Error) {
+        alert(`Failed to create booking or order: ${error.message}`);
+      } else {
+        alert('Failed to create booking or order.');
+      }
     }
   };
 

@@ -1,6 +1,6 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 
 interface User {
   id: string;
@@ -24,7 +24,7 @@ interface AuthContextType {
 }
 
 // Strict env-only: read VITE_API_BASE (no fallback)
-const API_BASE = (import.meta as any).env?.VITE_API_BASE as string | undefined;
+const API_BASE = import.meta.env.VITE_API_BASE;
 const API_AVAILABLE = Boolean(API_BASE);
 
 // If API_BASE is provided, set axios baseURL globally and enable cookies.
@@ -51,9 +51,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true);
       setUser(data.user);
       return data.user as User;
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      throw new Error(axiosErr.response?.data?.message || 'Invalid email or password');
+    } catch (error) {
+      throw new Error(extractMessage(error, 'Invalid email or password'));
     }
   };
 
@@ -65,9 +64,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true);
       setUser(data.user);
       return data.user as User;
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      throw new Error(axiosErr.response?.data?.message || 'Failed to register. Please try again.');
+    } catch (error) {
+      throw new Error(extractMessage(error, 'Failed to register. Please try again.'));
     }
   };
 
@@ -94,9 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       await axios.post('/api/auth/forgot-password', { email });
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      throw new Error(axiosErr.response?.data?.message || 'Failed to send reset link.');
+    } catch (error) {
+      throw new Error(extractMessage(error, 'Failed to send reset link.'));
     }
   };
 
@@ -105,9 +102,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       await axios.post(`/api/auth/reset-password/${token}`, { password });
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      throw new Error(axiosErr.response?.data?.message || 'Failed to reset password.');
+    } catch (error) {
+      throw new Error(extractMessage(error, 'Failed to reset password.'));
     }
   };
 
@@ -125,10 +121,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data);
       setIsAuthenticated(true);
       return data as User;
-    } catch (err) {
+    } catch (error) {
       setIsAuthenticated(false);
       setUser(null);
-      throw new Error('Failed to fetch profile.');
+      throw new Error(extractMessage(error, 'Failed to fetch profile.'));
     } finally {
       setAuthLoading(false);
     }
@@ -146,9 +142,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data } = await axios.put('/api/auth/profile', fields);
       setUser(data.user);
       return data.user as User;
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      throw new Error(axiosErr.response?.data?.message || 'Failed to update profile.');
+    } catch (error) {
+      throw new Error(extractMessage(error, 'Failed to update profile.'));
     }
   };
 
@@ -178,4 +173,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
+// The context hook is exported here for convenience even though the file also exports non-component utilities.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
+const extractMessage = (error: unknown, fallback: string) => {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message ?? fallback;
+  }
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+  return fallback;
+};
+

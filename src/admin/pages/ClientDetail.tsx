@@ -45,9 +45,13 @@ const ClientSessions: React.FC = () => {
 
         const data: Session[] = await res.json();
         setSessions(data);
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || 'Error loading sessions.');
+      } catch (error) {
+        console.error(error);
+        if (error instanceof Error) {
+          setError(error.message || 'Error loading sessions.');
+        } else {
+          setError('Error loading sessions.');
+        }
       } finally {
         setLoading(false);
       }
@@ -102,8 +106,9 @@ const ClientSessions: React.FC = () => {
                   </p>
                   <p className="text-sm text-gray-600">
                     Mode:{' '}
-                    <span className="font-medium capitalize">{session.mode}</span> | 
-                    Duration: <span className="font-medium">{session.duration} min</span>
+                    <span className="font-medium capitalize">{session.mode}</span>
+                    {' '}| Duration:{' '}
+                    <span className="font-medium">{session.duration} min</span>
                   </p>
                 </div>
               </div>
