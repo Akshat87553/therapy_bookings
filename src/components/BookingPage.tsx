@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { format, addDays, parse, addMinutes } from 'date-fns';
 import { ArrowLeft, ArrowRight, Monitor, Users, Check } from 'lucide-react';
 import axios from 'axios';
+import { apiUrl } from '../utils/api';
 
 type SessionMode = 'in-person' | 'online';
 type BookingStep = 'session' | 'details' | 'payment' | 'confirmation';
@@ -35,8 +36,6 @@ axios.defaults.withCredentials = true;
 const adminId = '682fa52d899e328f422b6851';
 
 // Strict env-only base URL
-const API_BASE = import.meta.env.VITE_API_BASE;
-
 const BookingPage: React.FC = () => {
   // ─── Session / UI state ──────────────────────────────────────────
   const [selectedMode, setSelectedMode] = useState<SessionMode>('in-person');
@@ -93,14 +92,8 @@ const BookingPage: React.FC = () => {
       setFeesLoading(true);
       setFeesError(null);
 
-      if (!API_BASE) {
-        setFeesError('VITE_API_BASE is not set. Please add it to .env and restart the dev server.');
-        setFeesLoading(false);
-        return;
-      }
-
       const regionParam = userCountry === 'IN' ? 'india' : 'intl';
-      const url = `${API_BASE}/api/public/fees/${adminId}?region=${regionParam}`;
+      const url = `${apiUrl(`/api/public/fees/${adminId}`)}?region=${regionParam}`;
 
       try {
         const { data } = await axios.get(url);
@@ -125,18 +118,12 @@ const BookingPage: React.FC = () => {
 
   // ---------- Fetch available slots ----------
   const fetchAvailableSlots = async () => {
-    if (!API_BASE) {
-      console.error('VITE_API_BASE is not set — cannot fetch available slots.');
-      setAvailableSlotsByDate({});
-      return;
-    }
-
     const start = format(new Date(), 'yyyy-MM-dd');
     const end = format(addDays(new Date(), 6), 'yyyy-MM-dd');
 
     try {
       const { data } = await axios.get<SlotData[]>(
-        `${API_BASE}/api/schedule/available-slots`,
+        apiUrl('/api/schedule/available-slots'),
         { params: { start, end, adminId }, withCredentials: true }
       );
 
@@ -273,11 +260,6 @@ const BookingPage: React.FC = () => {
 
   // ─── handle payment flow (uses API_BASE)
   const handlePayment = async () => {
-    if (!API_BASE) {
-      alert('Server base URL not configured. Please set VITE_API_BASE in your .env and restart dev server.');
-      return;
-    }
-
     try {
       const bookingData = {
         adminId,
@@ -295,12 +277,12 @@ const BookingPage: React.FC = () => {
         status: 'pending',
       };
 
-      const bookingResp = await axios.post(`${API_BASE}/api/bookings`, bookingData, { withCredentials: true });
+      const bookingResp = await axios.post(apiUrl('/api/bookings'), bookingData, { withCredentials: true });
       const bookingId: string = bookingResp.data.bookingId;
       if (!bookingId) throw new Error('Booking creation failed: no bookingId returned');
 
       const { data } = await axios.post(
-        `${API_BASE}/api/payments/create-order`,
+        apiUrl('/api/payments/create-order'),
         { bookingId, amount: sessionPrice },
         { withCredentials: true }
       );
@@ -316,7 +298,7 @@ const BookingPage: React.FC = () => {
         order_id:  orderId,
         handler: async (resp: RazorpayResponse) => {
           try {
-            const verifyResp = await axios.post(`${API_BASE}/api/payments/verify`, {
+            const verifyResp = await axios.post(apiUrl('/api/payments/verify'), {
               razorpay_payment_id: resp.razorpay_payment_id,
               razorpay_order_id:  resp.razorpay_order_id,
               razorpay_signature: resp.razorpay_signature,
