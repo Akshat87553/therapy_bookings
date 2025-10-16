@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
+
+type SlotType = 'online' | 'in_person' | 'both';
 
 interface AvailabilitySlot {
   time: string;
   isAvailable: boolean;
-  slotType: string;
+  slotType: SlotType;
 }
 
 interface BaseWeekViewProps {
@@ -18,13 +19,13 @@ const API_URL = '/api/schedule';
 
 const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) => {
   const [selectedTimeRange, setSelectedTimeRange] = useState<'Night' | 'Day'>('Day');
-  const [slotType, setSlotType] = useState<'online' | 'in_person' | 'both'>('online');
-  const [selectedSlots, setSelectedSlots] = useState<Record<string, { available: boolean; type: string }>>({});
+  const [slotType, setSlotType] = useState<SlotType>('online');
+  const [selectedSlots, setSelectedSlots] = useState<Record<string, { available: boolean; type: SlotType }>>({});
   const [error, setError] = useState<string | null>(null);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
 
-  const timeSlots = {
+  const timeSlots: Record<'Night' | 'Day', string[]> = {
     Night: [
       '12:00 AM', '12:30 AM', '01:00 AM', '01:30 AM', '02:00 AM', '02:30 AM',
       '03:00 AM', '03:30 AM', '04:00 AM', '04:30 AM', '05:00 AM', '05:30 AM',
@@ -44,12 +45,17 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate]);
 
+  interface AvailabilityDay {
+    date: string;
+    slots: AvailabilitySlot[];
+  }
+
   const fetchAvailabilitySlots = async () => {
     try {
       const start = format(weekDates[0], 'yyyy-MM-dd');
       const end = format(weekDates[6], 'yyyy-MM-dd');
 
-      const response = await axios.get(
+      const response = await axios.get<AvailabilityDay[]>(
         `${API_URL}/availability`,
         {
           params: { start, end },
@@ -57,10 +63,10 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
         }
       );
 
-      const slots: Record<string, { available: boolean; type: string }> = {};
-      response.data.forEach((dayEntry: { date: string; slots: AvailabilitySlot[] }) => {
+      const slots: Record<string, { available: boolean; type: SlotType }> = {};
+      response.data.forEach((dayEntry) => {
         const dateKey = format(new Date(dayEntry.date), 'yyyy-MM-dd');
-        dayEntry.slots.forEach((slot: AvailabilitySlot) => {
+        dayEntry.slots.forEach((slot) => {
           const key = `${dateKey}-${slot.time}`;
           slots[key] = {
             available: slot.isAvailable,
@@ -71,9 +77,9 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
 
       setSelectedSlots(slots);
       setError(null);
-    } catch (e: any) {
-      console.error('Error fetching availability slots:', e);
-      if (e.response?.status === 401) {
+    } catch (error) {
+      console.error('Error fetching availability slots:', error);
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
         setError('Please log in to view availability');
       } else {
         setError('Failed to fetch availability slots');
@@ -109,9 +115,9 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
       );
       onSlotSelect(dateString, dayOfWeek, time, slotType, newSlotState);
       setError(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Slot update failed:', error);
-      if (error.response?.status === 401) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
         setError('Please log in to update availability');
       } else {
         setError('Failed to update slot');
@@ -129,19 +135,19 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
     const dayOfWeek = format(date, 'EEEE').toUpperCase();
     const currentDaySlots = timeSlots[selectedTimeRange];
 
-    const originalStates: Record<string, any> = {};
-    currentDaySlots.forEach(time => {
-        const key = `${dateString}-${time}`;
-        originalStates[key] = selectedSlots[key];
+    const originalStates: Record<string, { available: boolean; type: SlotType } | undefined> = {};
+    currentDaySlots.forEach((time) => {
+      const key = `${dateString}-${time}`;
+      originalStates[key] = selectedSlots[key];
     });
 
-    setSelectedSlots(prev => {
-        const newSelectedSlots = {...prev};
-        currentDaySlots.forEach(time => {
-            const key = `${dateString}-${time}`;
-            newSelectedSlots[key] = { available: shouldSelect, type: slotType };
-        });
-        return newSelectedSlots;
+    setSelectedSlots((prev) => {
+      const newSelectedSlots = { ...prev };
+      currentDaySlots.forEach((time) => {
+        const key = `${dateString}-${time}`;
+        newSelectedSlots[key] = { available: shouldSelect, type: slotType };
+      });
+      return newSelectedSlots;
     });
 
     // Prefer bulk endpoint if available on server
@@ -158,18 +164,18 @@ const BaseWeekView: React.FC<BaseWeekViewProps> = ({ startDate, onSlotSelect }) 
         { withCredentials: true }
       );
 
-      currentDaySlots.forEach(time => {
-          onSlotSelect(dateString, dayOfWeek, time, slotType, shouldSelect);
+      currentDaySlots.forEach((time) => {
+        onSlotSelect(dateString, dayOfWeek, time, slotType, shouldSelect);
       });
       setError(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Bulk update failed:', error);
-      if (error.response?.status === 401) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
         setError('Please log in to update availability');
       } else {
         setError('Failed to update all slots');
       }
-      setSelectedSlots(prev => ({...prev, ...originalStates}));
+      setSelectedSlots((prev) => ({ ...prev, ...originalStates }));
     }
   };
 

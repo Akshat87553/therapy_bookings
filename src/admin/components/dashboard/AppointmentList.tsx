@@ -4,8 +4,6 @@ import axios from 'axios';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import {
-  Home,
-  Video,
   Mail,
   Phone,
   Calendar,
@@ -59,12 +57,18 @@ const AppointmentList: React.FC<AppointmentListProps> = ({ date }) => {
           }
         );
         setBookings(data);
-      } catch (err: any) {
-        console.error('Error fetching admin bookings:', err);
-        setError(
-          err.response?.data?.message ||
-            'Could not load bookings. Please try again.'
-        );
+      } catch (error) {
+        console.error('Error fetching admin bookings:', error);
+        if (axios.isAxiosError<{ message?: string }>(error)) {
+          setError(
+            error.response?.data?.message ||
+              'Could not load bookings. Please try again.'
+          );
+        } else if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError('Could not load bookings. Please try again.');
+        }
       }
       setLoading(false);
     };
@@ -73,10 +77,10 @@ const AppointmentList: React.FC<AppointmentListProps> = ({ date }) => {
 
   const handleCreate = () => {
     // Navigate to the “create” page, passing the current date
-     const isoDate = format(date, 'yyyy-MM-dd');
-  const path = `/admin/bookings/create?date=${isoDate}`;
-  console.log('Trying to navigate to:', path);
-  navigate(path);
+    const isoDate = format(date, 'yyyy-MM-dd');
+    const path = `/admin/bookings/create?date=${isoDate}`;
+    console.log('Trying to navigate to:', path);
+    navigate(path);
   };
 
   if (loading) {
@@ -122,16 +126,6 @@ const AppointmentList: React.FC<AppointmentListProps> = ({ date }) => {
           const sessionTime = bk.session.timeSlot;
           const modeLabel =
             bk.session.mode === 'online' ? 'Video Call' : 'In-person';
-          const locationLabel =
-            bk.session.mode === 'online' ? (
-              <span className="flex items-center text-sm text-gray-600">
-                <Video className="w-4 h-4 mr-1" /> Online
-              </span>
-            ) : (
-              <span className="flex items-center text-sm text-gray-600">
-                <Home className="w-4 h-4 mr-1" /> In-studio
-              </span>
-            );
           const notes = bk.session.notes || '—';
           const status = bk.status;
           const statusIcon =

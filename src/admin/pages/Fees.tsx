@@ -54,9 +54,15 @@ const Fees: React.FC = () => {
         if (typeof data.offerCouplesTherapy === 'boolean') {
           setOfferCouplesTherapy(data.offerCouplesTherapy);
         }
-      } catch (err: any) {
-        console.error('Error fetching fees:', err);
-        setError(err.response?.data?.message || 'Failed to load fees');
+      } catch (error) {
+        console.error('Error fetching fees:', error);
+        if (axios.isAxiosError<{ message?: string }>(error)) {
+          setError(error.response?.data?.message || 'Failed to load fees');
+        } else if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError('Failed to load fees');
+        }
       } finally {
         setLoading(false);
       }
@@ -89,9 +95,15 @@ const Fees: React.FC = () => {
         { withCredentials: true }
       );
       // Optionally show a “success” toast here
-    } catch (err: any) {
-      console.error('Error saving fees:', err);
-      setError(err.response?.data?.message || 'Failed to save fees');
+    } catch (error) {
+      console.error('Error saving fees:', error);
+      if (axios.isAxiosError<{ message?: string }>(error)) {
+        setError(error.response?.data?.message || 'Failed to save fees');
+      } else if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to save fees');
+      }
     } finally {
       setSaving(false);
     }

@@ -21,8 +21,12 @@ const LoginForm: React.FC = () => {
       } else {
         navigate('/');
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to login. Please try again.');
+      }
     }
   };
 

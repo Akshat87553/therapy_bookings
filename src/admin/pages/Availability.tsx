@@ -42,9 +42,9 @@ const Availability: React.FC = () => {
         }
       );
       setError(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating availability:', error);
-      if (error.response?.status === 401) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
         setError('Please log in to update availability');
       } else {
         setError('Failed to update availability');

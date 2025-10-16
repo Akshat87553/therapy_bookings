@@ -5,6 +5,13 @@ interface SessionMetricsProps {
   period: 'week' | 'month' | 'quarter' | 'year';
 }
 
+const periodLabels: Record<SessionMetricsProps['period'], string> = {
+  week: 'Weekly overview',
+  month: 'Monthly overview',
+  quarter: 'Quarterly overview',
+  year: 'Year to date overview',
+};
+
 const SessionMetrics: React.FC<SessionMetricsProps> = ({ period }) => {
   // This is simplified - in a real app, you'd use a proper charting library
   
@@ -33,7 +40,10 @@ const SessionMetrics: React.FC<SessionMetricsProps> = ({ period }) => {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-        <h3 className="font-medium text-gray-800">Session Metrics</h3>
+        <div>
+          <h3 className="font-medium text-gray-800">Session Metrics</h3>
+          <p className="text-xs text-gray-500">{periodLabels[period]}</p>
+        </div>
         <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-md">
           <Download className="w-4 h-4" />
         </button>
