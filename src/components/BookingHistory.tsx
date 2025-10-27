@@ -4,6 +4,7 @@ import axios from 'axios';
 import { format, startOfDay } from 'date-fns';
 import { Calendar, Clock, Video, Users, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 
 interface Booking {
   bookingId: string;
@@ -13,10 +14,6 @@ interface Booking {
   status: 'pending' | 'paid' | 'cancelled';
   createdAt: string;
 }
-
-// --------- Minimal env-based base URL (Vite) ----------
-const API_BASE = (import.meta as any).env?.VITE_API_BASE as string | undefined;
-// -------------------------------------------------------
 
 const BookingHistory: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -31,7 +28,7 @@ const BookingHistory: React.FC = () => {
       window.alert('Your request to reschedule has been sent to Nainika.');
 
       // 2) POST to /api/notifications/reschedule (cookie-based auth)
-      await axios.post(`${API_BASE}/api/notifications/reschedule`, { bookingId }, { withCredentials: true });
+      await axios.post(apiUrl('/api/notifications/reschedule'), { bookingId }, { withCredentials: true });
       // No need to alter local UI state; admin panel will pick it up
     } catch (e) {
       console.error('Error sending reschedule request', e);
@@ -41,10 +38,16 @@ const BookingHistory: React.FC = () => {
   useEffect(() => {
     const fetchBookings = async () => {
       try {
-        const response = await axios.get<Booking[]>(`${API_BASE}/api/bookings/history`, { withCredentials: true });
+        const response = await axios.get<Booking[]>(apiUrl('/api/bookings/history'), { withCredentials: true });
         setBookings(response.data);
-      } catch (err: any) {
-        setError(err.response?.data?.message || 'Failed to fetch bookings');
+      } catch (error) {
+        if (axios.isAxiosError<{ message?: string }>(error)) {
+          setError(error.response?.data?.message || 'Failed to fetch bookings');
+        } else if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError('Failed to fetch bookings');
+        }
       } finally {
         setLoading(false);
       }

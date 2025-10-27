@@ -18,8 +18,12 @@ const RegisterForm: React.FC = () => {
     try {
       await register(name, email, password, phone);
       navigate('/');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to register. Please try again.');
+      }
     }
   };
 

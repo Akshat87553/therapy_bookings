@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { AxiosError } from 'axios';
+import axios from 'axios';
 
 const Profile: React.FC = () => {
   const { user, getProfile, updateProfile, logout, authLoading } = useAuth();
@@ -16,21 +16,26 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
-    const fillFromUser = (u: any) => {
-      if (!mounted) return;
-      setName(u?.name ?? '');
-      setEmail(u?.email ?? '');
-      setPhone(u?.phone ?? '');
+    const populateFromUser = (authUser: typeof user) => {
+      if (!mounted || !authUser) return;
+      setName(authUser.name ?? '');
+      setEmail(authUser.email ?? '');
+      setPhone(authUser.phone ?? '');
     };
 
     if (user) {
-      fillFromUser(user);
+      populateFromUser(user);
     } else if (!authLoading) {
       getProfile()
-        .then((data) => fillFromUser(data))
-        .catch((err) => {
-          const axiosErr = err as AxiosError<{ message?: string }>;
-          console.error('Get profile error:', axiosErr.response?.data?.message ?? axiosErr.message);
+        .then((data) => populateFromUser(data))
+        .catch((error) => {
+          if (axios.isAxiosError<{ message?: string }>(error)) {
+            console.error('Get profile error:', error.response?.data?.message ?? error.message);
+          } else if (error instanceof Error) {
+            console.error('Get profile error:', error.message);
+          } else {
+            console.error('Get profile error: unknown error');
+          }
           navigate('/login');
         });
     }
@@ -48,9 +53,14 @@ const Profile: React.FC = () => {
       await updateProfile({ name, email, phone, password });
       setMessage('Profile updated successfully');
       setPassword('');
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      setError(axiosErr.response?.data?.message ?? axiosErr.message ?? 'Failed to update profile');
+    } catch (error) {
+      if (axios.isAxiosError<{ message?: string }>(error)) {
+        setError(error.response?.data?.message ?? error.message ?? 'Failed to update profile');
+      } else if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to update profile');
+      }
     }
   };
 
